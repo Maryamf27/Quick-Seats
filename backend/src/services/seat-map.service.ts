@@ -1,6 +1,7 @@
 import { Types } from "mongoose";
 import { EventModel } from "../models/event.model.js";
 import { SeatModel } from "../models/seat.model.js";
+import { getEffectiveSeatStatus } from "./seat-expiration.service.js";
 import { AppError } from "../utils/app-error.js";
 import { parseInput } from "../utils/validation.js";
 import { objectIdSchema } from "../validators/common.validator.js";
@@ -22,20 +23,22 @@ function emptySummary(): SeatSummary {
 }
 
 async function summarize(filter: Record<string, unknown>): Promise<SeatSummary> {
-  const grouped = await SeatModel.aggregate<{ _id: SeatStatus; count: number }>([
-    { $match: filter },
-    { $group: { _id: "$status", count: { $sum: 1 } } },
-  ]).exec();
+  const seats = await SeatModel.find(filter)
+    .select("status lockedUntil")
+    .lean()
+    .exec();
   const summary = emptySummary();
 
-  for (const group of grouped) {
-    summary.total += group.count;
-    if (group._id === "AVAILABLE") {
-      summary.available = group.count;
-    } else if (group._id === "HELD") {
-      summary.held = group.count;
-    } else if (group._id === "BOOKED") {
-      summary.booked = group.count;
+  for (const seat of seats) {
+    const status = getEffectiveSeatStatus(seat as { status: SeatStatus; lockedUntil: Date | null });
+    summary.total += 1;
+
+    if (status === "AVAILABLE") {
+      summary.available += 1;
+    } else if (status === "HELD") {
+      summary.held += 1;
+    } else if (status === "BOOKED") {
+      summary.booked += 1;
     }
   }
 
@@ -68,7 +71,7 @@ export async function getSeatMap(eventIdValue: string, input: unknown) {
     overallSummaryPromise,
     summaryPromise,
     SeatModel.find(scopedFilter)
-      .select("section row seatNumber category price status")
+      .select("section row seatNumber category price status lockedUntil")
       .sort({ section: 1, row: 1, seatNumber: 1 })
       .skip((query.page - 1) * query.limit)
       .limit(query.limit)
@@ -88,7 +91,7 @@ export async function getSeatMap(eventIdValue: string, input: unknown) {
       seatNumber: seat.seatNumber,
       category: seat.category,
       price: seat.price,
-      status: seat.status,
+      status: getEffectiveSeatStatus(seat as { status: SeatStatus; lockedUntil: Date | null }),
     })),
     pagination: {
       page: query.page,

@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import app from "./app.js";
 import { connectDatabase } from "./config/database.js";
 import { env } from "./config/env.js";
+import { startSeatHoldCleanupScheduler } from "./services/seat-expiration.service.js";
 
 function listen(): Promise<Server> {
   return new Promise((resolve, reject) => {
@@ -37,8 +38,11 @@ async function closeServer(server: Server): Promise<void> {
 async function startServer(): Promise<void> {
   let server: Server | undefined;
 
+  let cleanupTimer: NodeJS.Timeout | undefined;
+
   try {
     await connectDatabase();
+    cleanupTimer = startSeatHoldCleanupScheduler();
     server = await listen();
     console.info(`QuickSeats API listening on port ${env.PORT}`);
   } catch (error: unknown) {
@@ -62,6 +66,10 @@ async function startServer(): Promise<void> {
     console.info(`${signal} received; shutting down QuickSeats API`);
 
     let shutdownFailed = false;
+
+    if (cleanupTimer) {
+      clearInterval(cleanupTimer);
+    }
 
     try {
       await closeServer(server);

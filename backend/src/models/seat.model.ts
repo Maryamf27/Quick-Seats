@@ -16,6 +16,9 @@ export interface Seat {
   category: SeatCategory;
   price: number;
   status: SeatStatus;
+  lockedBy?: Types.ObjectId | null;
+  lockedUntil?: Date | null;
+  holdId?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -34,6 +37,15 @@ const seatSchema = new Schema<Seat>(
     category: { type: String, enum: SEAT_CATEGORIES, required: true },
     price: { type: Number, required: true, min: 0 },
     status: { type: String, enum: SEAT_STATUSES, default: "AVAILABLE", required: true },
+    lockedBy: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+      index: true,
+      nullable: true,
+    },
+    lockedUntil: { type: Date, default: null, index: true, nullable: true },
+    holdId: { type: String, default: null, trim: true, index: true, nullable: true },
   },
   { timestamps: true, versionKey: false },
 );
@@ -44,5 +56,7 @@ seatSchema.index(
 );
 seatSchema.index({ eventId: 1, status: 1 });
 seatSchema.index({ eventId: 1, category: 1 });
+seatSchema.index({ status: 1, lockedUntil: 1 });
+seatSchema.index({ eventId: 1, holdId: 1, status: 1 });
 
 export const SeatModel: Model<Seat> = model<Seat>("Seat", seatSchema);

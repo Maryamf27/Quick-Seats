@@ -8,6 +8,7 @@ import { notFoundMiddleware } from "./middlewares/not-found.middleware.js";
 import { healthRouter } from "./routes/health.routes.js";
 import { authRouter } from "./routes/auth.routes.js";
 import { eventRouter } from "./routes/event.routes.js";
+import { seatHoldRouter } from "./routes/seat-hold.routes.js";
 import { venueRouter } from "./routes/venue.routes.js";
 
 const app = express();
@@ -21,6 +22,7 @@ app.use("/api", healthRouter);
 app.use("/api", authRouter);
 app.use("/api", venueRouter);
 app.use("/api", eventRouter);
+app.use("/api", seatHoldRouter);
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);
 

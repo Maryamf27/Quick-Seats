@@ -8,6 +8,10 @@ import {
   listEventsController,
   updateEventController,
 } from "../controllers/event.controller.js";
+import {
+  holdSeatsController,
+  releaseHoldController,
+} from "../controllers/seat-hold.controller.js";
 import { authenticate } from "../middlewares/auth.middleware.js";
 import { authorize } from "../middlewares/role.middleware.js";
 
@@ -24,6 +28,8 @@ eventRouter.post(
   generateEventSeatsController,
 );
 eventRouter.get("/events/:eventId/seats", getEventSeatMapController);
+eventRouter.post("/events/:eventId/seats/hold", authenticate, holdSeatsController);
+eventRouter.post("/events/:eventId/seats/release", authenticate, releaseHoldController);
 eventRouter
   .route("/events/:eventId")
   .get(getEventController)

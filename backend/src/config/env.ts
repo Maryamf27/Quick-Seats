@@ -17,6 +17,23 @@ const environmentSchema = z.object({
     .string()
     .trim()
     .min(8, "INITIAL_ADMIN_PASSWORD must be at least 8 characters long"),
+  SEAT_HOLD_DURATION_MINUTES: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(1440)
+    .default(10),
+  INTERNAL_CLEANUP_SECRET: z
+    .string()
+    .trim()
+    .min(32, "INTERNAL_CLEANUP_SECRET must be at least 32 characters long")
+    .default("replace-with-a-long-random-secret-for-seat-cleanup"),
+  SEAT_CLEANUP_INTERVAL_SECONDS: z.coerce
+    .number()
+    .int()
+    .min(5)
+    .max(3600)
+    .default(60),
 });
 
 const environmentResult = environmentSchema.safeParse(process.env);

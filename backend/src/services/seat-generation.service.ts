@@ -52,6 +52,9 @@ async function insertSeatDocuments(
           category: section.seatCategory,
           price: section.price ?? 0,
           status: "AVAILABLE" as const,
+          lockedBy: null,
+          lockedUntil: null,
+          holdId: null,
         });
 
         if (batch.length === batchSize) {
