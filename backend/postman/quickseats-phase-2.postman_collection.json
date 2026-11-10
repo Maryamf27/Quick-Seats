@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "bcab8c06-9313-49ad-9a7e-17a7902d11e2",
     "name": "QuickSeats",
-    "description": "QuickSeats backend collection for Phase 2 + Authentication and Authorization testing.",
+    "description": "QuickSeats backend collection for authentication, events, seat locking, and Stripe test-mode payments.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -291,6 +291,20 @@
       "item": [
         {
           "name": "Get paginated seat map",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const seat = pm.response.json().data.seats.find(function (item) { return item.status === 'AVAILABLE'; });",
+                  "  if (seat) { pm.environment.set('seatId', seat.id); }",
+                  "}"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/api/events/{{eventId}}/seats?page=1&limit=100"
@@ -308,6 +322,174 @@
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/api/events/{{eventId}}/seats?page=1&limit=100&category=VIP"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Seat Locking",
+      "item": [
+        {
+          "name": "Hold Seats",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Seat hold created', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code === 200) { pm.environment.set('holdId', pm.response.json().data.holdId); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"seatIds\": [\"{{seatId}}\"]\n}"
+            },
+            "url": "{{baseUrl}}/api/events/{{eventId}}/seats/hold"
+          }
+        },
+        {
+          "name": "Release Hold",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"holdId\": \"{{holdId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/events/{{eventId}}/seats/release"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Payments",
+      "description": "Set eventId and holdId after holding seats. Stripe Checkout is test-mode only.",
+      "item": [
+        {
+          "name": "Create Checkout Session",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Checkout session created', function () { pm.response.to.have.status(201); });",
+                  "if (pm.response.code === 201) { pm.environment.set('bookingId', pm.response.json().data.bookingId); pm.environment.set('checkoutUrl', pm.response.json().data.checkoutUrl); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"holdId\": \"{{holdId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/bookings/checkout"
+          }
+        },
+        {
+          "name": "Get Booking",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/bookings/{{bookingId}}"
+          }
+        },
+        {
+          "name": "Get My Bookings",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/bookings/my?page=1&limit=20"
+          }
+        },
+        {
+          "name": "Get Booking Status",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/bookings/{{bookingId}}/status"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Webhook Testing",
+      "description": "For valid and duplicate webhook deliveries, use Stripe CLI: stripe listen --forward-to {{baseUrl}}/api/payments/webhook. Resend a delivered event with stripe events resend <event_id>.",
+      "item": [
+        {
+          "name": "Valid Stripe Webhook (Stripe CLI)",
+          "description": "A valid Stripe-Signature is generated by Stripe CLI. Do not copy a live secret into Postman.",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Stripe-Signature", "value": "{{stripeSignature}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"evt_test_replace_with_cli_event_id\",\n  \"object\": \"event\",\n  \"type\": \"checkout.session.completed\",\n  \"data\": { \"object\": { \"object\": \"checkout.session\" } }\n}"
+            },
+            "url": "{{baseUrl}}/api/payments/webhook"
+          }
+        },
+        {
+          "name": "Invalid Signature",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Invalid signature rejected', function () { pm.response.to.have.status(400); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Stripe-Signature", "value": "invalid" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"evt_invalid_signature\",\n  \"object\": \"event\",\n  \"type\": \"checkout.session.completed\",\n  \"data\": { \"object\": {} }\n}"
+            },
+            "url": "{{baseUrl}}/api/payments/webhook"
+          }
+        },
+        {
+          "name": "Duplicate Webhook (Stripe CLI)",
+          "description": "Resend the same Stripe event ID using stripe events resend. Database idempotency prevents duplicate booking transitions.",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Stripe-Signature", "value": "{{stripeSignature}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"evt_test_replace_with_same_cli_event_id\",\n  \"object\": \"event\",\n  \"type\": \"checkout.session.completed\",\n  \"data\": { \"object\": { \"object\": \"checkout.session\" } }\n}"
+            },
+            "url": "{{baseUrl}}/api/payments/webhook"
           }
         }
       ]

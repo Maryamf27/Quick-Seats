@@ -10,11 +10,14 @@ import { authRouter } from "./routes/auth.routes.js";
 import { eventRouter } from "./routes/event.routes.js";
 import { seatHoldRouter } from "./routes/seat-hold.routes.js";
 import { venueRouter } from "./routes/venue.routes.js";
+import { bookingRouter } from "./routes/booking.routes.js";
+import { paymentRouter } from "./routes/payment.routes.js";
 
 const app = express();
 
 app.use(helmet());
-app.use(cors({ origin: env.CLIENT_URL }));
+app.use(cors({ origin: env.CLIENT_ORIGIN }));
+app.use("/api/payments", paymentRouter);
 app.use(express.json());
 app.use(morgan(env.NODE_ENV === "development" ? "dev" : "combined"));
 
@@ -23,6 +26,7 @@ app.use("/api", authRouter);
 app.use("/api", venueRouter);
 app.use("/api", eventRouter);
 app.use("/api", seatHoldRouter);
+app.use("/api/bookings", bookingRouter);
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);
 

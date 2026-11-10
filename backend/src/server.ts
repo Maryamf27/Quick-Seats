@@ -1,13 +1,18 @@
-import type { Server } from "node:http";
+import { createServer, type Server } from "node:http";
 import mongoose from "mongoose";
 import app from "./app.js";
 import { connectDatabase } from "./config/database.js";
 import { env } from "./config/env.js";
 import { startSeatHoldCleanupScheduler } from "./services/seat-expiration.service.js";
+import { startRefundRetryScheduler } from "./services/refund.service.js";
+import {
+  closeSocketServer,
+  createSocketServer,
+} from "./sockets/socket.server.js";
+import type { QuickSeatsSocketServer } from "./sockets/socket.types.js";
 
-function listen(): Promise<Server> {
+function listen(server: Server): Promise<Server> {
   return new Promise((resolve, reject) => {
-    const server = app.listen(env.PORT);
     const onListening = () => {
       server.off("error", onError);
       resolve(server);
@@ -37,17 +42,40 @@ async function closeServer(server: Server): Promise<void> {
 
 async function startServer(): Promise<void> {
   let server: Server | undefined;
-
+  let io: QuickSeatsSocketServer | undefined;
   let cleanupTimer: NodeJS.Timeout | undefined;
+  let refundTimer: NodeJS.Timeout | undefined;
 
   try {
     await connectDatabase();
+    server = createServer(app);
+    io = createSocketServer(server);
     cleanupTimer = startSeatHoldCleanupScheduler();
-    server = await listen();
+    refundTimer = startRefundRetryScheduler();
+    await listen(server);
     console.info(`QuickSeats API listening on port ${env.PORT}`);
   } catch (error: unknown) {
     const errorType = error instanceof Error ? error.name : "UnknownError";
     console.error(`QuickSeats API failed to start (${errorType})`);
+    if (cleanupTimer) {
+      clearInterval(cleanupTimer);
+    }
+    if (refundTimer) {
+      clearInterval(refundTimer);
+    }
+    if (io) {
+      try {
+        await closeSocketServer(io);
+      } catch (closeError: unknown) {
+        console.error("Socket.IO cleanup after startup failure failed", closeError);
+      }
+    } else if (server?.listening) {
+      try {
+        await closeServer(server);
+      } catch (closeError: unknown) {
+        console.error("HTTP cleanup after startup failure failed", closeError);
+      }
+    }
     try {
       await mongoose.disconnect();
     } catch (disconnectError: unknown) {
@@ -70,12 +98,19 @@ async function startServer(): Promise<void> {
     if (cleanupTimer) {
       clearInterval(cleanupTimer);
     }
+    if (refundTimer) {
+      clearInterval(refundTimer);
+    }
 
     try {
-      await closeServer(server);
-      console.info("HTTP server closed");
+      if (io) {
+        await closeSocketServer(io);
+      } else {
+        await closeServer(server);
+      }
+      console.info("Socket.IO and HTTP server closed");
     } catch (error: unknown) {
-      console.error("HTTP server shutdown failed", error);
+      console.error("Socket.IO and HTTP server shutdown failed", error);
       shutdownFailed = true;
     }
 

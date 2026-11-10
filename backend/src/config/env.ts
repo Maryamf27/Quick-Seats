@@ -5,7 +5,16 @@ const environmentSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   PORT: z.coerce.number().int().positive().default(5000),
   MONGODB_URI: z.string().trim().min(1, "MONGODB_URI is required"),
-  CLIENT_URL: z.string().url().default("http://localhost:3000"),
+  CLIENT_ORIGIN: z.string().url().default(process.env.CLIENT_URL ?? "http://localhost:3000"),
+  SOCKET_CORS_ORIGINS: z
+    .string()
+    .default(
+      process.env.CLIENT_ORIGIN ??
+        process.env.CLIENT_URL ??
+        "http://localhost:3000",
+    )
+    .transform((value) => value.split(",").map((origin) => origin.trim()))
+    .pipe(z.array(z.string().url()).min(1)),
   JWT_ACCESS_SECRET: z
     .string()
     .trim()
@@ -34,6 +43,26 @@ const environmentSchema = z.object({
     .min(5)
     .max(3600)
     .default(60),
+  STRIPE_SECRET_KEY: z
+    .string()
+    .trim()
+    .min(20)
+    .startsWith("sk_test_")
+    .refine((value) => !value.includes("replace_me"), "Replace the Stripe test key placeholder"),
+  STRIPE_WEBHOOK_SECRET: z
+    .string()
+    .trim()
+    .min(20)
+    .startsWith("whsec_")
+    .refine((value) => !value.includes("replace_me"), "Replace the Stripe webhook secret placeholder"),
+  STRIPE_CURRENCY: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z]{3}$/)
+    .transform((value) => value.toLowerCase()),
+  STRIPE_CHECKOUT_SUCCESS_URL: z.string().url(),
+  STRIPE_CHECKOUT_CANCEL_URL: z.string().url(),
+  PAYMENT_HOLD_DURATION_MINUTES: z.coerce.number().int().min(30).max(1440).default(30),
 });
 
 const environmentResult = environmentSchema.safeParse(process.env);

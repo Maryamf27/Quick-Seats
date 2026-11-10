@@ -30,3 +30,11 @@ export const PAYMENT_STATUSES = [
   "REFUNDED",
 ] as const;
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
+
+export const REFUND_STATUSES = [
+  "NOT_REQUIRED",
+  "PENDING",
+  "SUCCEEDED",
+  "FAILED",
+] as const;
+export type RefundStatus = (typeof REFUND_STATUSES)[number];

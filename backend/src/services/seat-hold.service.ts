@@ -1,13 +1,14 @@
 import crypto from "node:crypto";
-import mongoose, { Types } from "mongoose";
+import mongoose, { Types, type QueryFilter } from "mongoose";
 import { z } from "zod";
 import { env } from "../config/env.js";
 import { EventModel } from "../models/event.model.js";
-import { SeatModel } from "../models/seat.model.js";
+import { SeatModel, type Seat } from "../models/seat.model.js";
 import { AppError } from "../utils/app-error.js";
 import { parseInput } from "../utils/validation.js";
 import { objectIdSchema } from "../validators/common.validator.js";
 import { holdSeatsSchema, releaseHoldSchema } from "../validators/seat-hold.validator.js";
+import { notifySeatsHeld, notifySeatsReleased } from "./seat-notification.service.js";
 
 const HOLD_DURATION_MS = env.SEAT_HOLD_DURATION_MINUTES * 60 * 1000;
 
@@ -106,7 +107,7 @@ export async function holdSeats(
       }
     });
 
-    return {
+    const result = {
       holdId,
       eventId: eventId.toString(),
       userId: userId.toString(),
@@ -114,6 +115,8 @@ export async function holdSeats(
       createdAt: now.toISOString(),
       expiresAt: expiresAt.toISOString(),
     };
+    notifySeatsHeld(result);
+    return result;
   } finally {
     await session.endSession();
   }
@@ -128,26 +131,56 @@ export async function releaseHold(
   const userId = new Types.ObjectId(parseInput(objectIdSchema, userIdValue));
   const payload = parseInput(releaseHoldSchema, input) as ReleaseHoldInput;
 
-  const result = await SeatModel.updateMany(
-    {
-      eventId,
-      holdId: payload.holdId,
-      status: "HELD",
-      lockedBy: userId,
-    },
-    {
-      $set: {
-        status: "AVAILABLE",
-        lockedBy: null,
-        lockedUntil: null,
-        holdId: null,
-      },
-    },
-  ).exec();
+  const session = await mongoose.startSession();
+  let releasedSeatIds: string[] = [];
 
-  return {
-    holdId: payload.holdId,
-    eventId: eventId.toString(),
-    releasedCount: result.modifiedCount,
-  };
+  try {
+    await session.withTransaction(async () => {
+      const filter: QueryFilter<Seat> = {
+        eventId,
+        holdId: payload.holdId,
+        status: "HELD",
+        lockedBy: userId,
+      };
+      const seats = await SeatModel.find(filter)
+        .session(session)
+        .select("_id")
+        .lean<{ _id: Types.ObjectId }[]>()
+        .exec();
+      const result = await SeatModel.updateMany(
+        filter,
+        {
+          $set: {
+            status: "AVAILABLE",
+            lockedBy: null,
+            lockedUntil: null,
+            holdId: null,
+          },
+        },
+      )
+        .session(session)
+        .exec();
+
+      if (result.modifiedCount !== seats.length) {
+        throw new AppError("Seat hold changed while it was being released", 409);
+      }
+
+      releasedSeatIds = seats.map((seat) => seat._id.toString());
+    });
+
+    notifySeatsReleased({
+      eventId: eventId.toString(),
+      holdId: payload.holdId,
+      seatIds: releasedSeatIds,
+      eventName: "seat:released",
+    });
+
+    return {
+      holdId: payload.holdId,
+      eventId: eventId.toString(),
+      releasedCount: releasedSeatIds.length,
+    };
+  } finally {
+    await session.endSession();
+  }
 }
