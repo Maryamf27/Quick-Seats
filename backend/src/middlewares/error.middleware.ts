@@ -37,12 +37,8 @@ export const errorMiddleware: ErrorRequestHandler = (
       : "Something went wrong";
 
   if (statusCode >= 500) {
-    if (env.NODE_ENV === "development") {
-      console.error("Request error", error);
-    } else {
-      const errorType = error instanceof Error ? error.name : "UnknownError";
-      console.error(`Request error (${errorType})`);
-    }
+    const errorType = error instanceof Error ? error.name : "UnknownError";
+    console.error(`Request error (${errorType})`);
   }
 
   return sendError(response, message, statusCode);

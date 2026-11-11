@@ -15,10 +15,18 @@ import type {
   SeatUpdatePayload,
   ServerToClientEvents,
 } from "../src/sockets/socket.types.js";
+import {
+  getIsolatedMongoTestUri,
+  getLocalRedisTestUrl,
+} from "./helpers/test-infrastructure.js";
 
-const mongoUri = process.env.MONGODB_TEST_URI;
+const mongoUri = getIsolatedMongoTestUri(process.env.MONGODB_TEST_URI);
+const redisTestUrl = getLocalRedisTestUrl(process.env.REDIS_TEST_URL);
+const integrationOptIn = process.env.RUN_INTEGRATION_TESTS === "1";
 process.env.NODE_ENV = "test";
 process.env.MONGODB_URI = mongoUri ?? "mongodb://127.0.0.1:27017/quickseats-test";
+process.env.REDIS_URL = redisTestUrl ?? "redis://127.0.0.1:6379/0";
+process.env.BULLMQ_REDIS_URL = process.env.BULLMQ_REDIS_TEST_URL ?? process.env.REDIS_URL;
 process.env.CLIENT_ORIGIN = "http://localhost:3000";
 process.env.SOCKET_CORS_ORIGINS = "http://localhost:3000";
 process.env.JWT_ACCESS_SECRET = "test-only-secret-that-is-long-enough-for-jwt-signing";
@@ -41,6 +49,7 @@ const [
   { BookingModel },
   { PaymentEventModel },
   { stripe },
+  { connectRedis, closeRedis },
   { clearExpiredSeatHolds },
   { closeSocketServer, createSocketServer },
 ] =
@@ -53,6 +62,7 @@ const [
     import("../src/models/booking.model.js"),
     import("../src/models/payment-event.model.js"),
     import("../src/config/stripe.js"),
+    import("../src/config/redis.js"),
     import("../src/services/seat-expiration.service.js"),
     import("../src/sockets/socket.server.js"),
   ]);
@@ -65,6 +75,7 @@ const seatIds: Types.ObjectId[] = [];
 let httpServer: HttpServer | undefined;
 let socketServer: ReturnType<typeof createSocketServer> | undefined;
 let connectedDatabase = false;
+let connectedRedis = false;
 
 function connectClient(
   url: string,
@@ -215,8 +226,16 @@ test("Socket.io and Express use the same HTTP server", async () => {
     const url = `http://127.0.0.1:${address.port}`;
     const client = await connectClient(url);
     const healthResponse = await fetch(`${url}/api/health`);
+    const readinessResponse = await fetch(`${url}/api/health/ready`);
+    const venueMutationResponse = await fetch(`${url}/api/venues`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({}),
+    });
 
     assert.equal(healthResponse.status, 200);
+    assert.equal(readinessResponse.status, 503);
+    assert.equal(venueMutationResponse.status, 401);
     assert.equal(client.connected, true);
     const webhookResponse = await fetch(`${url}/api/payments/webhook`, {
       method: "POST",
@@ -234,9 +253,16 @@ test("Socket.io and Express use the same HTTP server", async () => {
 
 test(
   "Socket.io auth, rooms, and Phase 4 seat notifications",
-  { skip: !mongoUri ? "Set MONGODB_TEST_URI to a transaction-capable test database" : false },
+  {
+    skip:
+      !integrationOptIn || !mongoUri || !redisTestUrl
+        ? "Set RUN_INTEGRATION_TESTS=1 with isolated MONGODB_TEST_URI and REDIS_TEST_URL services"
+        : false,
+  },
   async (context) => {
     assert.ok(mongoUri);
+    await connectRedis();
+    connectedRedis = true;
     await mongoose.connect(mongoUri);
     connectedDatabase = true;
 
@@ -285,7 +311,18 @@ test(
       endDate: new Date(Date.now() + 4 * 60 * 60_000),
       status: "PUBLISHED",
     });
-    eventIds.push(eventOne._id, eventTwo._id);
+    const draftEvent = await EventModel.create({
+      title: "Socket Test Draft Event",
+      slug: `socket-draft-${new Types.ObjectId().toString()}`,
+      description: "Draft event",
+      category: "test",
+      venueId,
+      organizerId: user._id,
+      startDate: new Date(Date.now() + 2 * 60 * 60_000),
+      endDate: new Date(Date.now() + 4 * 60 * 60_000),
+      status: "DRAFT",
+    });
+    eventIds.push(eventOne._id, eventTwo._id, draftEvent._id);
 
     const seats = await SeatModel.insertMany(
       [1, 2, 3, 4].map((seatNumber) => ({
@@ -346,8 +383,19 @@ test(
     });
     assert.equal((await joinEvent(secondViewer, eventOne._id.toString())).success, true);
     assert.equal((await joinEvent(otherEventViewer, eventTwo._id.toString())).success, true);
+    assert.equal((await joinEvent(viewer, draftEvent._id.toString())).success, false);
     assert.equal((await joinEvent(viewer, "not-an-object-id")).success, false);
     assert.equal((await joinEvent(viewer, new Types.ObjectId().toString())).success, false);
+    assert.equal(
+      (await fetch(`${url}/api/events/${draftEvent._id.toString()}`)).status,
+      404,
+    );
+    assert.equal(
+      (
+        await fetch(`${url}/api/events/${draftEvent._id.toString()}/seats`)
+      ).status,
+      404,
+    );
 
     const heldEventPromise = waitForSeatEvent(viewer, "seat:held");
     const heldEventForSecondPromise = waitForSeatEvent(secondViewer, "seat:held");
@@ -826,5 +874,8 @@ after(async () => {
     await EventModel.deleteMany({ _id: { $in: eventIds } }).exec();
     await UserModel.deleteMany({ _id: { $in: userIds } }).exec();
     await mongoose.disconnect();
+  }
+  if (connectedRedis) {
+    await closeRedis();
   }
 });

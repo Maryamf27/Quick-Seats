@@ -3,8 +3,10 @@ import mongoose from "mongoose";
 import app from "./app.js";
 import { connectDatabase } from "./config/database.js";
 import { env } from "./config/env.js";
-import { startSeatHoldCleanupScheduler } from "./services/seat-expiration.service.js";
-import { startRefundRetryScheduler } from "./services/refund.service.js";
+import { cache, closeRedis, connectRedis } from "./config/redis.js";
+import { logRateLimitMetrics } from "./services/rate-limit.service.js";
+import { closeJobQueues } from "./jobs/queues.js";
+import { subscribeToWorkerSeatUpdates } from "./services/seat-notification.service.js";
 import {
   closeSocketServer,
   createSocketServer,
@@ -43,44 +45,71 @@ async function closeServer(server: Server): Promise<void> {
 async function startServer(): Promise<void> {
   let server: Server | undefined;
   let io: QuickSeatsSocketServer | undefined;
-  let cleanupTimer: NodeJS.Timeout | undefined;
-  let refundTimer: NodeJS.Timeout | undefined;
+  let stopSeatNotificationSubscriber: (() => Promise<void>) | undefined;
+  let cacheMetricsTimer: NodeJS.Timeout | undefined;
 
   try {
     await connectDatabase();
+    await connectRedis();
     server = createServer(app);
     io = createSocketServer(server);
-    cleanupTimer = startSeatHoldCleanupScheduler();
-    refundTimer = startRefundRetryScheduler();
-    await listen(server);
+    try {
+      stopSeatNotificationSubscriber = await subscribeToWorkerSeatUpdates();
+    } catch (error: unknown) {
+      const errorType = error instanceof Error ? error.name : "UnknownError";
+      console.error(`Worker seat notification subscription failed (${errorType})`);
+    }
+    cacheMetricsTimer = setInterval(() => {
+      cache.logMetrics();
+      logRateLimitMetrics();
+    }, 60_000);
+    cacheMetricsTimer.unref();
+    const listening = listen(server);
+    server.listen(env.PORT);
+    await listening;
     console.info(`QuickSeats API listening on port ${env.PORT}`);
   } catch (error: unknown) {
     const errorType = error instanceof Error ? error.name : "UnknownError";
     console.error(`QuickSeats API failed to start (${errorType})`);
-    if (cleanupTimer) {
-      clearInterval(cleanupTimer);
+    if (stopSeatNotificationSubscriber) {
+      try {
+        await stopSeatNotificationSubscriber();
+      } catch (error: unknown) {
+        const errorType = error instanceof Error ? error.name : "UnknownError";
+        console.error(`Socket notification cleanup after startup failure failed (${errorType})`);
+      }
     }
-    if (refundTimer) {
-      clearInterval(refundTimer);
+    if (cacheMetricsTimer) {
+      clearInterval(cacheMetricsTimer);
     }
     if (io) {
       try {
         await closeSocketServer(io);
       } catch (closeError: unknown) {
-        console.error("Socket.IO cleanup after startup failure failed", closeError);
+        const errorType = closeError instanceof Error ? closeError.name : "UnknownError";
+        console.error(`Socket.IO cleanup after startup failure failed (${errorType})`);
       }
     } else if (server?.listening) {
       try {
         await closeServer(server);
       } catch (closeError: unknown) {
-        console.error("HTTP cleanup after startup failure failed", closeError);
+        const errorType = closeError instanceof Error ? closeError.name : "UnknownError";
+        console.error(`HTTP cleanup after startup failure failed (${errorType})`);
       }
     }
     try {
       await mongoose.disconnect();
     } catch (disconnectError: unknown) {
-      console.error("MongoDB cleanup after startup failure failed", disconnectError);
+      const errorType = disconnectError instanceof Error ? disconnectError.name : "UnknownError";
+      console.error(`MongoDB cleanup after startup failure failed (${errorType})`);
     }
+    try {
+      await closeJobQueues();
+    } catch (queueCloseError: unknown) {
+      const errorType = queueCloseError instanceof Error ? queueCloseError.name : "UnknownError";
+      console.error(`Background queue cleanup after startup failure failed (${errorType})`);
+    }
+    await closeRedis();
     process.exitCode = 1;
     return;
   }
@@ -95,11 +124,19 @@ async function startServer(): Promise<void> {
 
     let shutdownFailed = false;
 
-    if (cleanupTimer) {
-      clearInterval(cleanupTimer);
+    if (stopSeatNotificationSubscriber) {
+      try {
+        await stopSeatNotificationSubscriber();
+      } catch (error: unknown) {
+        const errorType = error instanceof Error ? error.name : "UnknownError";
+        console.error(`Socket notification subscriber shutdown failed (${errorType})`);
+        shutdownFailed = true;
+      }
     }
-    if (refundTimer) {
-      clearInterval(refundTimer);
+    if (cacheMetricsTimer) {
+      clearInterval(cacheMetricsTimer);
+      cache.logMetrics();
+      logRateLimitMetrics();
     }
 
     try {
@@ -110,7 +147,8 @@ async function startServer(): Promise<void> {
       }
       console.info("Socket.IO and HTTP server closed");
     } catch (error: unknown) {
-      console.error("Socket.IO and HTTP server shutdown failed", error);
+      const errorType = error instanceof Error ? error.name : "UnknownError";
+      console.error(`Socket.IO and HTTP server shutdown failed (${errorType})`);
       shutdownFailed = true;
     }
 
@@ -118,10 +156,19 @@ async function startServer(): Promise<void> {
       await mongoose.disconnect();
       console.info("MongoDB connection closed");
     } catch (error: unknown) {
-      console.error("MongoDB shutdown failed", error);
+      const errorType = error instanceof Error ? error.name : "UnknownError";
+      console.error(`MongoDB shutdown failed (${errorType})`);
       shutdownFailed = true;
     }
 
+    try {
+      await closeJobQueues();
+    } catch (error: unknown) {
+      const errorType = error instanceof Error ? error.name : "UnknownError";
+      console.error(`Background queue shutdown failed (${errorType})`);
+      shutdownFailed = true;
+    }
+    await closeRedis();
     process.exitCode = shutdownFailed ? 1 : 0;
   };
 

@@ -19,7 +19,10 @@ export function registerEventRoomHandlers(socket: QuickSeatsSocket): void {
 
     try {
       const eventId = validateEventId(payload?.eventId);
-      const eventExists = await EventModel.exists({ _id: eventId });
+      const eventExists = await EventModel.exists({
+        _id: eventId,
+        status: "PUBLISHED",
+      });
 
       if (!eventExists) {
         acknowledge({ success: false, error: "Event not found" });
@@ -31,7 +34,8 @@ export function registerEventRoomHandlers(socket: QuickSeatsSocket): void {
     } catch (error: unknown) {
       acknowledge({ success: false, error: getErrorMessage(error) });
       if (!(error instanceof AppError)) {
-        console.error("Socket event-room join failed", error);
+        const errorType = error instanceof Error ? error.name : "UnknownError";
+        console.error(`Socket event-room join failed (${errorType})`);
       }
     }
   });
@@ -48,7 +52,8 @@ export function registerEventRoomHandlers(socket: QuickSeatsSocket): void {
     } catch (error: unknown) {
       acknowledge({ success: false, error: getErrorMessage(error) });
       if (!(error instanceof AppError)) {
-        console.error("Socket event-room leave failed", error);
+        const errorType = error instanceof Error ? error.name : "UnknownError";
+        console.error(`Socket event-room leave failed (${errorType})`);
       }
     }
   });

@@ -4,7 +4,19 @@ import { EventModel } from "../models/event.model.js";
 import { SeatModel } from "../models/seat.model.js";
 import { UserModel } from "../models/user.model.js";
 import { VenueModel } from "../models/venue.model.js";
+import { env } from "../config/env.js";
+import { cache } from "../config/redis.js";
+import {
+  eventCacheKey,
+  eventListCacheKey,
+  eventListVersionKey,
+} from "./cache-keys.js";
+import {
+  invalidateEventCache,
+  invalidateEventListings,
+} from "./public-cache-invalidation.service.js";
 import { AppError } from "../utils/app-error.js";
+import type { UserRole } from "../types/domain.js";
 import { isDuplicateKeyError, parseInput } from "../utils/validation.js";
 import { objectIdSchema } from "../validators/common.validator.js";
 import {
@@ -74,95 +86,134 @@ export async function createEvent(input: unknown) {
     throw new AppError("Organizer not found", 404);
   }
 
-  return createWithUniqueSlug({
+  const event = await createWithUniqueSlug({
     ...data,
     venueId,
     organizerId,
   });
+  await invalidateEventListings();
+  return event;
 }
 
 export async function listEvents(query: EventListQuery) {
-  const filter: Record<string, unknown> = { status: "PUBLISHED" };
+  const loadEvents = async () => {
+    const filter: Record<string, unknown> = { status: "PUBLISHED" };
 
-  if (query.search) {
-    filter.title = { $regex: escapeRegex(query.search), $options: "i" };
-  }
-  if (query.category) {
-    filter.category = query.category.toLowerCase();
-  }
-  if (query.from || query.to) {
-    const startDate: Record<string, Date> = {};
-    if (query.from) {
-      startDate.$gte = query.from;
+    if (query.search) {
+      filter.title = { $regex: escapeRegex(query.search), $options: "i" };
     }
-    if (query.to) {
-      startDate.$lte = query.to;
+    if (query.category) {
+      filter.category = query.category.toLowerCase();
     }
-    filter.startDate = startDate;
-  }
-  if (query.city) {
-    const venues = await VenueModel.find({
-      "address.city": { $regex: `^${escapeRegex(query.city)}$`, $options: "i" },
-    })
-      .select("_id")
-      .lean()
-      .exec();
-    if (venues.length === 0) {
-      return {
-        events: [],
-        pagination: {
-          page: query.page,
-          limit: query.limit,
-          total: 0,
-          totalPages: 0,
-        },
-      };
+    if (query.from || query.to) {
+      const startDate: Record<string, Date> = {};
+      if (query.from) {
+        startDate.$gte = query.from;
+      }
+      if (query.to) {
+        startDate.$lte = query.to;
+      }
+      filter.startDate = startDate;
     }
-    filter.venueId = { $in: venues.map((venue) => venue._id) };
-  }
+    if (query.city) {
+      const venues = await VenueModel.find({
+        "address.city": { $regex: `^${escapeRegex(query.city)}$`, $options: "i" },
+      })
+        .select("_id")
+        .lean()
+        .exec();
+      if (venues.length === 0) {
+        return {
+          events: [],
+          pagination: {
+            page: query.page,
+            limit: query.limit,
+            total: 0,
+            totalPages: 0,
+          },
+        };
+      }
+      filter.venueId = { $in: venues.map((venue) => venue._id) };
+    }
 
-  const sortDirection = query.order === "asc" ? 1 : -1;
-  const [events, total] = await Promise.all([
-    EventModel.find(filter)
-      .sort({ [query.sortBy]: sortDirection })
-      .skip((query.page - 1) * query.limit)
-      .limit(query.limit)
-      .lean()
-      .exec(),
-    EventModel.countDocuments(filter).exec(),
-  ]);
+    const sortDirection = query.order === "asc" ? 1 : -1;
+    const [events, total] = await Promise.all([
+      EventModel.find(filter)
+        .sort({ [query.sortBy]: sortDirection })
+        .skip((query.page - 1) * query.limit)
+        .limit(query.limit)
+        .lean()
+        .exec(),
+      EventModel.countDocuments(filter).exec(),
+    ]);
 
-  return {
-    events,
-    pagination: {
-      page: query.page,
-      limit: query.limit,
-      total,
-      totalPages: Math.ceil(total / query.limit),
-    },
+    return {
+      events,
+      pagination: {
+        page: query.page,
+        limit: query.limit,
+        total,
+        totalPages: Math.ceil(total / query.limit),
+      },
+    };
   };
+
+  const version = await cache.getCounter(eventListVersionKey);
+  if (version === null) {
+    return loadEvents();
+  }
+
+  return cache.getOrLoad(
+    eventListCacheKey(version, query),
+    env.CACHE_EVENT_LIST_TTL_SECONDS,
+    loadEvents,
+    (result) => result.events.length > 0,
+  );
 }
 
 export async function getEventById(id: string) {
   const validId = parseInput(objectIdSchema, id);
-  const event = await EventModel.findById(validId)
-    .populate({ path: "venueId", select: "name description address capacity" })
-    .lean()
-    .exec();
+  return cache.getOrLoad(
+    eventCacheKey(validId),
+    env.CACHE_EVENT_TTL_SECONDS,
+    async () => {
+      const event = await EventModel.findOne({ _id: validId, status: "PUBLISHED" })
+        .populate({ path: "venueId", select: "name description address capacity" })
+        .lean()
+        .exec();
 
-  if (!event) {
-    throw new AppError("Event not found", 404);
-  }
-  return event;
+      if (!event) {
+        throw new AppError("Event not found", 404);
+      }
+      return event;
+    },
+    (event) => event.status === "PUBLISHED",
+  );
 }
 
-export async function updateEvent(id: string, input: unknown) {
+export function assertEventOrganizer(
+  organizerId: Types.ObjectId,
+  requesterId: string,
+  role: UserRole,
+): void {
+  if (role !== "ADMIN" && !organizerId.equals(requesterId)) {
+    throw new AppError("You do not have permission to manage this event", 403);
+  }
+}
+
+export async function updateEvent(
+  id: string,
+  input: unknown,
+  requesterId: string,
+  role: UserRole,
+) {
   const validId = parseInput(objectIdSchema, id);
   const changes = parseInput(updateEventSchema, input);
   const event = await EventModel.findById(validId).exec();
   if (!event) {
     throw new AppError("Event not found", 404);
   }
+  assertEventOrganizer(event.organizerId, requesterId, role);
 
   const nextStartDate = changes.startDate ?? event.startDate;
   const nextEndDate = changes.endDate ?? event.endDate;
@@ -179,8 +230,9 @@ export async function updateEvent(id: string, input: unknown) {
     if (changes.title && attempt > 0) {
       event.slug = `${slugify(changes.title)}-${attempt + 1}`;
     }
+    let updated: typeof event;
     try {
-      return await event.save();
+      updated = await event.save();
     } catch (error: unknown) {
       if (!isDuplicateKeyError(error) || !changes.title) {
         if (isDuplicateKeyError(error)) {
@@ -188,13 +240,20 @@ export async function updateEvent(id: string, input: unknown) {
         }
         throw error;
       }
+      continue;
     }
+    await invalidateEventCache(validId);
+    return updated;
   }
 
   throw new AppError("Could not generate a unique event slug", 409);
 }
 
-export async function deleteEvent(id: string): Promise<void> {
+export async function deleteEvent(
+  id: string,
+  requesterId: string,
+  role: UserRole,
+): Promise<void> {
   const validId = parseInput(objectIdSchema, id);
   const session = await mongoose.startSession();
   try {
@@ -203,15 +262,17 @@ export async function deleteEvent(id: string): Promise<void> {
       if (!event) {
         throw new AppError("Event not found", 404);
       }
+      assertEventOrganizer(event.organizerId, requesterId, role);
 
-      const [hasBookings, hasSeats] = await Promise.all([
-        BookingModel.exists({ eventId: event._id }).session(session),
-        SeatModel.exists({ eventId: event._id }).session(session),
-      ]);
-
+      const hasBookings = await BookingModel.exists({ eventId: event._id })
+        .session(session)
+        .exec();
       if (hasBookings) {
         throw new AppError("Event cannot be deleted while it has bookings", 409);
       }
+      const hasSeats = await SeatModel.exists({ eventId: event._id })
+        .session(session)
+        .exec();
       if (hasSeats) {
         throw new AppError("Event cannot be deleted while it has generated seats", 409);
       }
@@ -226,4 +287,5 @@ export async function deleteEvent(id: string): Promise<void> {
   } finally {
     await session.endSession();
   }
+  await invalidateEventCache(validId);
 }

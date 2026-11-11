@@ -7,9 +7,6 @@ import { parseInput } from "../utils/validation.js";
 import { objectIdSchema } from "../validators/common.validator.js";
 import { seatMapQuerySchema } from "../validators/event.validator.js";
 import type { SeatStatus } from "../types/domain.js";
-import type { z } from "zod";
-
-type SeatMapQuery = z.output<typeof seatMapQuerySchema>;
 
 export interface SeatSummary {
   total: number;
@@ -48,7 +45,10 @@ async function summarize(filter: Record<string, unknown>): Promise<SeatSummary> 
 export async function getSeatMap(eventIdValue: string, input: unknown) {
   const eventId = new Types.ObjectId(parseInput(objectIdSchema, eventIdValue));
   const query = parseInput(seatMapQuerySchema, input);
-  const eventExists = await EventModel.exists({ _id: eventId });
+  const eventExists = await EventModel.exists({
+    _id: eventId,
+    status: "PUBLISHED",
+  });
   if (!eventExists) {
     throw new AppError("Event not found", 404);
   }

@@ -215,25 +215,23 @@ async function handleCheckoutCompleted(
   }
 
   const expectedSeatIds = booking.seatIds.map((seatId) => seatId.toString()).sort();
-  const [bookableEvent, heldSeats] = await Promise.all([
-    EventModel.findOne({
-      _id: booking.eventId,
-      status: "PUBLISHED",
-      startDate: { $gt: new Date() },
-    })
-      .session(session)
-      .select("_id")
-      .lean()
-      .exec(),
-    SeatModel.find({
-      eventId: booking.eventId,
-      holdId: booking.holdId,
-    })
-      .session(session)
-      .select("_id status lockedBy lockedUntil")
-      .lean()
-      .exec(),
-  ]);
+  const bookableEvent = await EventModel.findOne({
+    _id: booking.eventId,
+    status: "PUBLISHED",
+    startDate: { $gt: new Date() },
+  })
+    .session(session)
+    .select("_id")
+    .lean()
+    .exec();
+  const heldSeats = await SeatModel.find({
+    eventId: booking.eventId,
+    holdId: booking.holdId,
+  })
+    .session(session)
+    .select("_id status lockedBy lockedUntil")
+    .lean()
+    .exec();
   const holdIsValid =
     Boolean(bookableEvent) &&
     booking.status === "PENDING" &&

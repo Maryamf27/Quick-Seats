@@ -5,6 +5,36 @@ const environmentSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   PORT: z.coerce.number().int().positive().default(5000),
   MONGODB_URI: z.string().trim().min(1, "MONGODB_URI is required"),
+  REDIS_URL: z
+    .string()
+    .trim()
+    .url()
+    .refine((value) => /^rediss?:\/\//i.test(value), "REDIS_URL must use redis:// or rediss://")
+    .optional(),
+  BULLMQ_REDIS_URL: z
+    .string()
+    .trim()
+    .url()
+    .refine((value) => /^rediss?:\/\//i.test(value), "BULLMQ_REDIS_URL must use redis:// or rediss://")
+    .optional(),
+  CACHE_EVENT_TTL_SECONDS: z.coerce.number().int().min(1).max(3600).default(60),
+  CACHE_EVENT_LIST_TTL_SECONDS: z.coerce.number().int().min(1).max(3600).default(30),
+  CACHE_VENUE_TTL_SECONDS: z.coerce.number().int().min(1).max(86400).default(300),
+  TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(0),
+  RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1000).max(3600000).default(60000),
+  RATE_LIMIT_MAX_REQUESTS: z.coerce.number().int().min(1).max(100000).default(300),
+  AUTH_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1000).max(86400000).default(900000),
+  AUTH_RATE_LIMIT_MAX_REQUESTS: z.coerce.number().int().min(1).max(10000).default(20),
+  AUTH_ACCOUNT_RATE_LIMIT_MAX_REQUESTS: z.coerce.number().int().min(1).max(1000).default(8),
+  SEAT_HOLD_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1000).max(3600000).default(60000),
+  SEAT_HOLD_RATE_LIMIT_MAX_REQUESTS: z.coerce.number().int().min(1).max(10000).default(8),
+  SEAT_HOLD_IP_RATE_LIMIT_MAX_REQUESTS: z.coerce.number().int().min(1).max(100000).default(40),
+  CHECKOUT_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1000).max(3600000).default(60000),
+  CHECKOUT_RATE_LIMIT_MAX_REQUESTS: z.coerce.number().int().min(1).max(10000).default(5),
+  CHECKOUT_IP_RATE_LIMIT_MAX_REQUESTS: z.coerce.number().int().min(1).max(100000).default(30),
+  EVENT_READ_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1000).max(3600000).default(60000),
+  EVENT_READ_RATE_LIMIT_MAX_REQUESTS: z.coerce.number().int().min(1).max(100000).default(120),
+  EVENT_BURST_RATE_LIMIT_MAX_REQUESTS: z.coerce.number().int().min(1).max(1000000).default(10000),
   CLIENT_ORIGIN: z.string().url().default(process.env.CLIENT_URL ?? "http://localhost:3000"),
   SOCKET_CORS_ORIGINS: z
     .string()
@@ -43,12 +73,18 @@ const environmentSchema = z.object({
     .min(5)
     .max(3600)
     .default(60),
+  BOOKING_CLEANUP_INTERVAL_SECONDS: z.coerce.number().int().min(5).max(3600).default(60),
+  SEAT_NOTIFICATION_OUTBOX_INTERVAL_SECONDS: z.coerce.number().int().min(5).max(3600).default(5),
+  BACKGROUND_JOB_ATTEMPTS: z.coerce.number().int().min(1).max(20).default(5),
+  BACKGROUND_JOB_BACKOFF_MS: z.coerce.number().int().min(100).max(3600000).default(5000),
+  REPORT_JOB_CONCURRENCY: z.coerce.number().int().min(1).max(20).default(2),
+  REPORT_RECOVERY_INTERVAL_SECONDS: z.coerce.number().int().min(5).max(3600).default(15),
   STRIPE_SECRET_KEY: z
     .string()
     .trim()
     .min(20)
-    .startsWith("sk_test_")
-    .refine((value) => !value.includes("replace_me"), "Replace the Stripe test key placeholder"),
+    .regex(/^sk_(test|live)_/)
+    .refine((value) => !value.includes("replace_me"), "Replace the Stripe key placeholder"),
   STRIPE_WEBHOOK_SECRET: z
     .string()
     .trim()
@@ -63,6 +99,53 @@ const environmentSchema = z.object({
   STRIPE_CHECKOUT_SUCCESS_URL: z.string().url(),
   STRIPE_CHECKOUT_CANCEL_URL: z.string().url(),
   PAYMENT_HOLD_DURATION_MINUTES: z.coerce.number().int().min(30).max(1440).default(30),
+}).superRefine((configuration, context) => {
+  if (configuration.NODE_ENV !== "production") {
+    return;
+  }
+
+  if (!configuration.REDIS_URL) {
+    context.addIssue({
+      code: "custom",
+      path: ["REDIS_URL"],
+      message: "REDIS_URL is required in production for shared rate limiting",
+    });
+  }
+  if (!configuration.BULLMQ_REDIS_URL) {
+    context.addIssue({
+      code: "custom",
+      path: ["BULLMQ_REDIS_URL"],
+      message: "BULLMQ_REDIS_URL is required in production for background workers",
+    });
+  }
+  if (!process.env.CLIENT_ORIGIN) {
+    context.addIssue({
+      code: "custom",
+      path: ["CLIENT_ORIGIN"],
+      message: "CLIENT_ORIGIN must be explicitly configured in production",
+    });
+  }
+  if (
+    !process.env.INTERNAL_CLEANUP_SECRET ||
+    configuration.INTERNAL_CLEANUP_SECRET.includes("replace-with")
+  ) {
+    context.addIssue({
+      code: "custom",
+      path: ["INTERNAL_CLEANUP_SECRET"],
+      message: "A non-placeholder INTERNAL_CLEANUP_SECRET is required in production",
+    });
+  }
+  if (
+    configuration.JWT_ACCESS_SECRET.includes("replace") ||
+    configuration.INITIAL_ADMIN_PASSWORD.includes("replace") ||
+    configuration.INITIAL_ADMIN_EMAIL.endsWith("@example.test")
+  ) {
+    context.addIssue({
+      code: "custom",
+      path: ["JWT_ACCESS_SECRET"],
+      message: "Replace all security credential placeholders before production",
+    });
+  }
 });
 
 const environmentResult = environmentSchema.safeParse(process.env);

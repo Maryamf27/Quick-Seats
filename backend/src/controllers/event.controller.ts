@@ -12,6 +12,14 @@ import { sendSuccess } from "../utils/api-response.js";
 import { parseInput } from "../utils/validation.js";
 import { eventIdParamsSchema } from "../validators/common.validator.js";
 import { listEventsQuerySchema } from "../validators/event.validator.js";
+import { AppError } from "../utils/app-error.js";
+
+function getActor(request: Parameters<RequestHandler>[0]) {
+  if (!request.user) {
+    throw new AppError("Authentication required", 401);
+  }
+  return request.user;
+}
 
 export const createEventController: RequestHandler = async (request, response) => {
   const payload = request.user
@@ -39,13 +47,15 @@ export const getEventController: RequestHandler = async (request, response) => {
 
 export const updateEventController: RequestHandler = async (request, response) => {
   const { eventId } = parseInput(eventIdParamsSchema, request.params);
-  const event = await updateEvent(eventId, request.body);
+  const actor = getActor(request);
+  const event = await updateEvent(eventId, request.body, actor.id, actor.role);
   return sendSuccess(response, event, "Event updated successfully");
 };
 
 export const deleteEventController: RequestHandler = async (request, response) => {
   const { eventId } = parseInput(eventIdParamsSchema, request.params);
-  await deleteEvent(eventId);
+  const actor = getActor(request);
+  await deleteEvent(eventId, actor.id, actor.role);
   return sendSuccess(response, null, "Event deleted successfully");
 };
 
@@ -54,7 +64,8 @@ export const generateEventSeatsController: RequestHandler = async (
   response,
 ) => {
   const { eventId } = parseInput(eventIdParamsSchema, request.params);
-  const result = await generateSeatsForEvent(eventId);
+  const actor = getActor(request);
+  const result = await generateSeatsForEvent(eventId, actor.id, actor.role);
   return sendSuccess(response, result, "Seats generated successfully");
 };
 

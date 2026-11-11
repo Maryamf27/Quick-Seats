@@ -3,6 +3,8 @@ import { EventModel } from "../models/event.model.js";
 import { SeatModel, type Seat } from "../models/seat.model.js";
 import { VenueModel } from "../models/venue.model.js";
 import { AppError } from "../utils/app-error.js";
+import type { UserRole } from "../types/domain.js";
+import { assertEventOrganizer } from "./event.service.js";
 import { isDuplicateKeyError, parseInput } from "../utils/validation.js";
 import { objectIdSchema } from "../validators/common.validator.js";
 import { venueSectionSchema } from "../validators/venue.validator.js";
@@ -82,6 +84,8 @@ export interface SeatGenerationSummary {
 
 export async function generateSeatsForEvent(
   eventIdValue: string,
+  requesterId: string,
+  role: UserRole,
 ): Promise<SeatGenerationSummary> {
   const eventId = new Types.ObjectId(parseInput(objectIdSchema, eventIdValue));
   const session = await mongoose.startSession();
@@ -93,6 +97,7 @@ export async function generateSeatsForEvent(
       if (!event) {
         throw new AppError("Event not found", 404);
       }
+      assertEventOrganizer(event.organizerId, requesterId, role);
 
       const venue = await VenueModel.findById(event.venueId).session(session).lean().exec();
       if (!venue) {

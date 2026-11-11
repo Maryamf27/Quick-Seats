@@ -53,7 +53,8 @@ export function registerSocketAuthentication(io: QuickSeatsSocketServer): void {
 
       return next();
     } catch (error: unknown) {
-      console.error("Socket authentication user lookup failed", error);
+      const errorType = error instanceof Error ? error.name : "UnknownError";
+      console.error(`Socket authentication user lookup failed (${errorType})`);
       return next(new Error("Unable to authenticate socket connection"));
     }
   });

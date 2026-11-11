@@ -12,9 +12,12 @@ import { seatHoldRouter } from "./routes/seat-hold.routes.js";
 import { venueRouter } from "./routes/venue.routes.js";
 import { bookingRouter } from "./routes/booking.routes.js";
 import { paymentRouter } from "./routes/payment.routes.js";
+import { globalRateLimit } from "./middlewares/rate-limit.middleware.js";
+import { organizerReportRouter } from "./routes/organizer-report.routes.js";
 
 const app = express();
 
+app.set("trust proxy", env.TRUST_PROXY_HOPS);
 app.use(helmet());
 app.use(cors({ origin: env.CLIENT_ORIGIN }));
 app.use("/api/payments", paymentRouter);
@@ -22,7 +25,9 @@ app.use(express.json());
 app.use(morgan(env.NODE_ENV === "development" ? "dev" : "combined"));
 
 app.use("/api", healthRouter);
+app.use("/api", globalRateLimit);
 app.use("/api", authRouter);
+app.use("/api", organizerReportRouter);
 app.use("/api", venueRouter);
 app.use("/api", eventRouter);
 app.use("/api", seatHoldRouter);

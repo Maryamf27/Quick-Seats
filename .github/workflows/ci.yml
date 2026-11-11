@@ -1,0 +1,86 @@
+name: Backend CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ ping: 1 }).ok'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+          --replSet rs0
+          --bind_ip_all
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      NODE_ENV: test
+      MONGODB_URI: mongodb://127.0.0.1:27017/quickseats-ci?replicaSet=rs0
+      MONGODB_TEST_URI: mongodb://127.0.0.1:27017/quickseats-test?replicaSet=rs0
+      REDIS_URL: redis://127.0.0.1:6379/0
+      REDIS_TEST_URL: redis://127.0.0.1:6379/0
+      BULLMQ_REDIS_TEST_URL: redis://127.0.0.1:6379/1
+      BULLMQ_REDIS_URL: redis://127.0.0.1:6379/1
+      RUN_INTEGRATION_TESTS: "1"
+      CLIENT_ORIGIN: http://localhost:3000
+      SOCKET_CORS_ORIGINS: http://localhost:3000
+      JWT_ACCESS_SECRET: ci-only-secret-that-is-long-enough-for-jwt-signing
+      JWT_ACCESS_EXPIRES_IN: 1h
+      INITIAL_ADMIN_NAME: CI Admin
+      INITIAL_ADMIN_EMAIL: ci-admin@example.test
+      INITIAL_ADMIN_PASSWORD: ci-only-password
+      INTERNAL_CLEANUP_SECRET: ci-only-internal-cleanup-secret-at-least-32-characters
+      STRIPE_SECRET_KEY: sk_test_ci_only_secret_1234567890
+      STRIPE_WEBHOOK_SECRET: whsec_ci_only_secret_1234567890
+      STRIPE_CURRENCY: usd
+      STRIPE_CHECKOUT_SUCCESS_URL: http://localhost:3000/booking/success
+      STRIPE_CHECKOUT_CANCEL_URL: http://localhost:3000/booking/cancel
+      SEAT_CLEANUP_INTERVAL_SECONDS: 3600
+      BOOKING_CLEANUP_INTERVAL_SECONDS: 3600
+      SEAT_NOTIFICATION_OUTBOX_INTERVAL_SECONDS: 3600
+      REPORT_RECOVERY_INTERVAL_SECONDS: 3600
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Initialize isolated MongoDB replica set
+        working-directory: .
+        run: |
+          docker exec "${{ job.services.mongodb.id }}" mongosh --quiet --eval "try { rs.status() } catch (error) { rs.initiate({_id: 'rs0', members: [{_id: 0, host: '127.0.0.1:27017'}]}) }"
+          for attempt in {1..30}; do
+            if docker exec "${{ job.services.mongodb.id }}" mongosh --quiet --eval "db.hello().isWritablePrimary" | grep -q true; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "MongoDB replica set did not become ready" >&2
+          exit 1
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run test:integration
+      - run: npm run build

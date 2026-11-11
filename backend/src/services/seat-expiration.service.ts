@@ -1,6 +1,7 @@
-import { env } from "../config/env.js";
 import mongoose, { Types, type QueryFilter } from "mongoose";
 import { SeatModel, type Seat } from "../models/seat.model.js";
+import { SeatNotificationOutboxModel } from "../models/seat-notification-outbox.model.js";
+import type { SeatUpdatePayload } from "../sockets/socket.types.js";
 import type { SeatStatus } from "../types/domain.js";
 import { notifySeatsReleased } from "./seat-notification.service.js";
 import { SOCKET_EVENTS } from "../sockets/socket.events.js";
@@ -15,7 +16,10 @@ export function getEffectiveSeatStatus(
   return seat.status;
 }
 
-export async function clearExpiredSeatHolds(now = new Date()): Promise<number> {
+export async function clearExpiredSeatHolds(
+  now = new Date(),
+  notificationMode: "local" | "outbox" = "local",
+): Promise<number> {
   const expiredSeats = await SeatModel.find({
     status: "HELD",
     holdId: { $ne: null },
@@ -71,36 +75,37 @@ export async function clearExpiredSeatHolds(now = new Date()): Promise<number> {
         }
 
         releasedSeatIds = seats.map((seat) => seat._id.toString());
+        if (releasedSeatIds.length > 0 && notificationMode === "outbox") {
+          const payload: SeatUpdatePayload = {
+            eventId,
+            holdId,
+            seats: releasedSeatIds.map((seatId) => ({
+              seatId,
+              status: "AVAILABLE",
+              lockedUntil: null,
+            })),
+            occurredAt: now.toISOString(),
+          };
+          await SeatNotificationOutboxModel.create(
+            [{ eventName: SOCKET_EVENTS.SEAT_EXPIRED, payload }],
+            { session },
+          );
+        }
       });
 
       processed += releasedSeatIds.length;
-      notifySeatsReleased({
-        eventId,
-        holdId,
-        seatIds: releasedSeatIds,
-        eventName: SOCKET_EVENTS.SEAT_EXPIRED,
-      });
+      if (notificationMode === "local") {
+        notifySeatsReleased({
+          eventId,
+          holdId,
+          seatIds: releasedSeatIds,
+          eventName: SOCKET_EVENTS.SEAT_EXPIRED,
+        });
+      }
     } finally {
       await session.endSession();
     }
   }
 
   return processed;
-}
-
-export function startSeatHoldCleanupScheduler(): NodeJS.Timeout | undefined {
-  if (process.env.NODE_ENV === "test") {
-    return undefined;
-  }
-
-  const intervalMs = env.SEAT_CLEANUP_INTERVAL_SECONDS * 1000;
-  if (!Number.isFinite(intervalMs) || intervalMs <= 0) {
-    return undefined;
-  }
-
-  return setInterval(() => {
-    void clearExpiredSeatHolds().catch((error: unknown) => {
-      console.error("Seat expiration cleanup failed", error);
-    });
-  }, intervalMs);
 }

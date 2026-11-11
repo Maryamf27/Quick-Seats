@@ -1,4 +1,6 @@
 import { Router } from "express";
+import { authenticate } from "../middlewares/auth.middleware.js";
+import { authorize } from "../middlewares/role.middleware.js";
 import {
   createVenueController,
   deleteVenueController,
@@ -11,11 +13,11 @@ export const venueRouter = Router();
 
 venueRouter
   .route("/venues")
-  .post(createVenueController)
+  .post(authenticate, authorize("ADMIN"), createVenueController)
   .get(listVenuesController);
 
 venueRouter
   .route("/venues/:id")
   .get(getVenueController)
-  .put(updateVenueController)
-  .delete(deleteVenueController);
+  .put(authenticate, authorize("ADMIN"), updateVenueController)
+  .delete(authenticate, authorize("ADMIN"), deleteVenueController);

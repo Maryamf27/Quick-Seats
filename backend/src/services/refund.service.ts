@@ -1,6 +1,5 @@
 import { Types } from "mongoose";
 import { stripe } from "../config/stripe.js";
-import { env } from "../config/env.js";
 import { BookingModel } from "../models/booking.model.js";
 import { AppError } from "../utils/app-error.js";
 
@@ -105,16 +104,4 @@ export async function retryPendingBookingRefunds(): Promise<void> {
       });
     }
   }
-}
-
-export function startRefundRetryScheduler(): NodeJS.Timeout | undefined {
-  if (process.env.NODE_ENV === "test") {
-    return undefined;
-  }
-
-  return setInterval(() => {
-    void retryPendingBookingRefunds().catch((error: unknown) => {
-      console.error("Pending booking refund scan failed", error);
-    });
-  }, env.SEAT_CLEANUP_INTERVAL_SECONDS * 1000);
 }

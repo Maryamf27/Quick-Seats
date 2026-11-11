@@ -6,6 +6,13 @@ import { AppError } from "../utils/app-error.js";
 import { hashPassword, comparePassword } from "../utils/password.js";
 import { isDuplicateKeyError, parseInput } from "../utils/validation.js";
 import { loginUserSchema, registerUserSchema } from "../validators/auth.validator.js";
+import type { UserRole } from "../types/domain.js";
+
+export function assertPublicRegistrationRole(role?: UserRole): void {
+  if (role && role !== "USER") {
+    throw new AppError("Public registration cannot assign organizer or admin roles", 400);
+  }
+}
 
 function sanitizeUser(user: { _id: { toString(): string }; fullName: string; email: string; role: string; createdAt: Date; updatedAt: Date }): SafeUser {
   return {
@@ -22,9 +29,7 @@ export async function registerUser(input: unknown) {
   const data = parseInput(registerUserSchema, input);
   const email = data.email.toLowerCase();
 
-  if (data.role && data.role !== "USER") {
-    throw new AppError("Public registration cannot assign organizer or admin roles", 400);
-  }
+  assertPublicRegistrationRole(data.role);
 
   try {
     const passwordHash = await hashPassword(data.password);

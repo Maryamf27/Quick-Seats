@@ -1,5 +1,9 @@
 import { EventModel } from "../models/event.model.js";
 import { VenueModel, type Venue } from "../models/venue.model.js";
+import { env } from "../config/env.js";
+import { cache } from "../config/redis.js";
+import { venueCacheKey } from "./cache-keys.js";
+import { invalidateVenueAndRelatedEvents } from "./public-cache-invalidation.service.js";
 import { AppError } from "../utils/app-error.js";
 import { isDuplicateKeyError, parseInput } from "../utils/validation.js";
 import { objectIdSchema } from "../validators/common.validator.js";
@@ -86,11 +90,17 @@ export async function listVenues(query: VenueListQuery) {
 
 export async function getVenueById(id: string) {
   const validId = parseInput(objectIdSchema, id);
-  const venue = await VenueModel.findById(validId).lean().exec();
-  if (!venue) {
-    throw new AppError("Venue not found", 404);
-  }
-  return venue;
+  return cache.getOrLoad(
+    venueCacheKey(validId),
+    env.CACHE_VENUE_TTL_SECONDS,
+    async () => {
+      const venue = await VenueModel.findById(validId).lean().exec();
+      if (!venue) {
+        throw new AppError("Venue not found", 404);
+      }
+      return venue;
+    },
+  );
 }
 
 export async function updateVenue(id: string, input: unknown) {
@@ -107,14 +117,17 @@ export async function updateVenue(id: string, input: unknown) {
   });
   Object.assign(venue, merged);
 
+  let updated: Venue;
   try {
-    return await venue.save();
+    updated = await venue.save();
   } catch (error: unknown) {
     if (isDuplicateKeyError(error)) {
       throw new AppError("A venue with these details already exists", 409);
     }
     throw error;
   }
+  await invalidateVenueAndRelatedEvents(validId);
+  return updated;
 }
 
 export async function deleteVenue(id: string): Promise<void> {
@@ -129,5 +142,9 @@ export async function deleteVenue(id: string): Promise<void> {
     throw new AppError("Venue cannot be deleted while it has associated events", 409);
   }
 
-  await VenueModel.deleteOne({ _id: venue._id }).exec();
+  const deletion = await VenueModel.deleteOne({ _id: venue._id }).exec();
+  if (deletion.deletedCount !== 1) {
+    throw new AppError("Venue not found", 404);
+  }
+  await invalidateVenueAndRelatedEvents(validId);
 }
