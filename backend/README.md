@@ -147,9 +147,9 @@ atomic Redis Lua script (`INCR` plus first-hit `PEXPIRE`) with fixed windows.
 Instances sharing the Redis URL share counters. User/account/IP identifiers
 are hashed before being included in keys. IP addresses come from Express
 `request.ip`; forwarded headers are only trusted through the configured
-`TRUST_PROXY_HOPS` setting. Set it to `1` when deployed behind Render's single
-trusted proxy, and leave it at `0` for direct local development. Do not trust
-arbitrary forwarded headers.
+`TRUST_PROXY_HOPS` setting. Configure it for the actual trusted proxy chain in
+your Railway deployment, and leave it at `0` for direct local development.
+Do not trust arbitrary forwarded headers.
 
 | Route category | Default policy |
 | --- | --- |
@@ -286,32 +286,32 @@ ephemeral MongoDB replica-set and Redis services and uses dummy test-only
 Stripe/JWT values; it does not require production secrets or deploy
 automatically.
 
-## Render deployment
+## Railway deployment
 
-The repository-root [`render.yaml`](../render.yaml) defines two independently deployed
-services, both rooted at `backend`:
+The backend runs as two Railway services rooted at the `backend` directory:
 
-- `quickseats-api`: build with `npm ci && npm run build`, start with
-  `npm start`, readiness path `/api/health/ready`.
-- `quickseats-worker`: build with `npm ci && npm run build`, start with
-  `npm run worker`; this process does not expose an HTTP port.
+- **API service:** build command `npm ci && npm run build`, start command
+  `npm start`, health check path `/api/health/ready`.
+- **Worker service:** build command `npm ci && npm run build`, start command
+  `npm run worker`. The worker does not expose an HTTP port.
 
-Before creating services, configure the `quickseats-production` environment
-group in Render with production `MONGODB_URI`, `REDIS_URL`,
-`BULLMQ_REDIS_URL`, `CLIENT_ORIGIN`, `SOCKET_CORS_ORIGINS`,
-`JWT_ACCESS_SECRET`, `INTERNAL_CLEANUP_SECRET`, initial admin credentials,
-Stripe credentials, checkout URLs, and the trusted proxy hop count. Use a transaction-capable MongoDB
-deployment and a Redis endpoint verified to support BullMQ. The worker needs
-an always-on plan; review provider pricing and networking before deployment.
-Automatic deploys are disabled in the Blueprint; deploy only after CI passes.
-No Render service has been deployed or verified from this repository state.
+Configure the required environment variables for both services in Railway.
+Mark credentials and secret-bearing URLs as secrets; ordinary environment
+settings such as TTLs, limits, and job intervals are configuration values.
+The API and worker both need MongoDB and a BullMQ-compatible Redis URL. The
+API also needs the cache/rate-limit Redis URL, CORS origins, and Stripe
+credentials and checkout URLs. Use a transaction-capable MongoDB deployment
+and a Redis service verified to support BullMQ. Set `TRUST_PROXY_HOPS` to the
+trusted proxy-chain length for your deployment rather than blindly trusting
+forwarded headers. The worker needs a continuously running Railway service.
+Verify both services' logs and readiness after each deployment.
 
 ### Stripe webhook
 
-Configure Stripe Test mode with the deployed URL
-`https://YOUR-RENDER-SERVICE.onrender.com/api/payments/webhook` and set
+Configure Stripe Test mode with the public URL of your Railway API service,
+ending in `/api/payments/webhook`, and set
 `STRIPE_WEBHOOK_SECRET` to the signing secret for that deployed endpoint. Do
-not use the local Stripe CLI forwarding secret on Render. The payment router
+not use the local Stripe CLI forwarding secret in Railway. The payment router
 is mounted before JSON parsing to preserve the raw request body; the backend
 verifies Stripe signatures and uses the MongoDB payment-event record for
 idempotency. Validate the full workflow in Stripe Test mode before enabling
@@ -330,12 +330,11 @@ deployed webhook.
 | Background jobs/reports | BullMQ worker startup and recurring scheduler registration are integration-tested when isolated Redis is supplied; full long-running retry/failure recovery is not stress-tested. |
 | Performance | A safe, read-only k6 script is provided; no load test has been executed and no capacity claim is made. |
 | CI | Workflow is configured but has not yet run on GitHub. |
-| Render | Blueprint is configured, but deployment, MongoDB/Redis connectivity, and webhook delivery require manual setup and remain unverified. |
+| Railway | Deployment configuration is managed in Railway; verify API/worker health, MongoDB/Redis connectivity, and Stripe webhook delivery in that environment. |
 
 Security findings fixed here: cross-organizer event writes/seat generation,
 public venue writes (venue mutations are now admin-only because venues have no
 owner field), and access to draft event details/seat maps/socket rooms.
 Production startup now rejects missing shared Redis and known placeholder
 secrets. Full external-service verification still requires a deployed
-transaction-capable MongoDB, compatible Redis, Stripe Test mode, and Render
-access.
+transaction-capable MongoDB, compatible Redis, and Stripe Test mode.
