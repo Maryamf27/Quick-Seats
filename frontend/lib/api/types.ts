@@ -274,3 +274,20 @@ export interface OrganizerReportQueued {
   reportId: string;
   status: OrganizerReportStatus;
 }
+
+export type OrganizerApplicationStatus = "PENDING" | "APPROVED" | "REJECTED";
+export interface OrganizerApplication {
+  _id: string;
+  userId: string | { _id: string; fullName: string; email: string; createdAt?: string };
+  businessName: string;
+  description: string;
+  status: OrganizerApplicationStatus;
+  reviewedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OrganizerEventListResult {
+  events: EventRecord[];
+  pagination: Pagination;
+}

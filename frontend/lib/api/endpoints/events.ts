@@ -3,6 +3,7 @@ import type { ApiRequestOptions, QueryValue } from "../client";
 import type {
   EventListResult,
   EventRecord,
+  OrganizerEventListResult,
   SeatGenerationResult,
   SeatHoldResult,
   SeatMapResult,
@@ -49,6 +50,12 @@ export interface SeatMapQuery extends Record<string, QueryValue> {
 }
 
 export const eventsApi = {
+  organizerMine(query: { page?: number; limit?: number }, accessToken: string, options?: ApiRequestOptions): Promise<OrganizerEventListResult> {
+    return api.get("/organizer/events", { ...options, accessToken, query });
+  },
+  organizerGet(eventId: string, accessToken: string, options?: ApiRequestOptions): Promise<EventRecord> {
+    return api.get(`/organizer/events/${encodeURIComponent(eventId)}`, { ...options, accessToken });
+  },
   list(
     query: ListEventsQuery = {},
     options?: ApiRequestOptions,

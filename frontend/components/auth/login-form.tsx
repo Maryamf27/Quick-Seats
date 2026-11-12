@@ -42,9 +42,9 @@ export function LoginForm() {
 
     setSubmitting(true);
     try {
-      await signIn({ email: email.trim(), password });
+      const user = await signIn({ email: email.trim(), password });
       const next = new URLSearchParams(window.location.search).get("next");
-      router.replace(getSafeReturnPath(next, window.location.origin));
+      router.replace(getSafeReturnPath(next, window.location.origin, user.role));
     } catch (error: unknown) {
       setFormError(getLoginError(error));
     } finally {

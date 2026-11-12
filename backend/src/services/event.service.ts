@@ -171,6 +171,24 @@ export async function listEvents(query: EventListQuery) {
   );
 }
 
+export async function listOrganizerEvents(organizerId: string, page: number, limit: number) {
+  const filter = { organizerId: new Types.ObjectId(organizerId) };
+  const [events, total] = await Promise.all([
+    EventModel.find(filter).populate({ path: "venueId", select: "name address" })
+      .sort({ startDate: -1, _id: -1 }).skip((page - 1) * limit).limit(limit).lean().exec(),
+    EventModel.countDocuments(filter).exec(),
+  ]);
+  return { events, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+}
+
+export async function getOrganizerEvent(id: string, requesterId: string, role: UserRole) {
+  const validId = parseInput(objectIdSchema, id);
+  const event = await EventModel.findById(validId).populate({ path: "venueId", select: "name address" }).lean().exec();
+  if (!event) throw new AppError("Event not found", 404);
+  assertEventOrganizer(event.organizerId, requesterId, role);
+  return event;
+}
+
 export async function getEventById(id: string) {
   const validId = parseInput(objectIdSchema, id);
   return cache.getOrLoad(

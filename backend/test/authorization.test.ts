@@ -9,6 +9,10 @@ import {
   getIsolatedMongoTestUri,
   getLocalRedisTestUrl,
 } from "./helpers/test-infrastructure.js";
+import {
+  createOrganizerApplicationSchema,
+  decideOrganizerApplicationSchema,
+} from "../src/validators/organizer-application.validator.js";
 
 test("event management is restricted to its organizer or an admin", () => {
   const organizerId = new Types.ObjectId();
@@ -30,6 +34,20 @@ test("public registration cannot grant privileged roles", () => {
   assert.doesNotThrow(() => assertPublicRegistrationRole("USER"));
   assert.throws(() => assertPublicRegistrationRole("ORGANIZER"), { statusCode: 400 });
   assert.throws(() => assertPublicRegistrationRole("ADMIN"), { statusCode: 400 });
+});
+
+test("organizer applications cannot carry a role assignment", () => {
+  const valid = {
+    businessName: "Northside Arts",
+    description: "We organize live arts events for our local community.",
+  };
+  assert.equal(createOrganizerApplicationSchema.safeParse(valid).success, true);
+  assert.equal(
+    createOrganizerApplicationSchema.safeParse({ ...valid, role: "ORGANIZER" }).success,
+    false,
+  );
+  assert.equal(decideOrganizerApplicationSchema.safeParse({ decision: "APPROVED" }).success, true);
+  assert.equal(decideOrganizerApplicationSchema.safeParse({ decision: "ORGANIZER" }).success, false);
 });
 
 test("expired holds are reported as available without changing stored state", () => {

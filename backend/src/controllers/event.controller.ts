@@ -3,7 +3,9 @@ import {
   createEvent,
   deleteEvent,
   getEventById,
+  getOrganizerEvent,
   listEvents,
+  listOrganizerEvents,
   updateEvent,
 } from "../services/event.service.js";
 import { getSeatMap } from "../services/seat-map.service.js";
@@ -12,6 +14,8 @@ import { sendSuccess } from "../utils/api-response.js";
 import { parseInput } from "../utils/validation.js";
 import { eventIdParamsSchema } from "../validators/common.validator.js";
 import { listEventsQuerySchema } from "../validators/event.validator.js";
+import { paginationSchema } from "../validators/common.validator.js";
+import { z } from "zod";
 import { AppError } from "../utils/app-error.js";
 
 function getActor(request: Parameters<RequestHandler>[0]) {
@@ -37,6 +41,20 @@ export const listEventsController: RequestHandler = async (request, response) =>
   const query = parseInput(listEventsQuerySchema, request.query);
   const result = await listEvents(query);
   return sendSuccess(response, result, "Events retrieved successfully");
+};
+
+export const listOrganizerEventsController: RequestHandler = async (request, response) => {
+  const actor = getActor(request);
+  const query = parseInput(z.object(paginationSchema).strict(), request.query);
+  const result = await listOrganizerEvents(actor.id, query.page, query.limit);
+  return sendSuccess(response, result, "Organizer events retrieved");
+};
+
+export const getOrganizerEventController: RequestHandler = async (request, response) => {
+  const { eventId } = parseInput(eventIdParamsSchema, request.params);
+  const actor = getActor(request);
+  const result = await getOrganizerEvent(eventId, actor.id, actor.role);
+  return sendSuccess(response, result, "Organizer event retrieved");
 };
 
 export const getEventController: RequestHandler = async (request, response) => {

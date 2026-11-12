@@ -4,6 +4,8 @@ import {
   deleteEventController,
   generateEventSeatsController,
   getEventController,
+  getOrganizerEventController,
+  listOrganizerEventsController,
   getEventSeatMapController,
   listEventsController,
   updateEventController,
@@ -21,6 +23,9 @@ import {
 } from "../middlewares/rate-limit.middleware.js";
 
 export const eventRouter = Router();
+
+eventRouter.get("/organizer/events", authenticate, authorize("ORGANIZER", "ADMIN"), listOrganizerEventsController);
+eventRouter.get("/organizer/events/:eventId", authenticate, authorize("ORGANIZER", "ADMIN"), getOrganizerEventController);
 
 eventRouter
   .route("/events")

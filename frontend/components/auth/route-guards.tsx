@@ -65,7 +65,7 @@ export function GuestOnlyRoute({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (status === "authenticated" && user) {
       const next = new URLSearchParams(window.location.search).get("next");
-      router.replace(getSafeReturnPath(next, window.location.origin));
+      router.replace(getSafeReturnPath(next, window.location.origin, user.role));
     }
   }, [router, status, user]);
 

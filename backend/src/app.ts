@@ -14,6 +14,7 @@ import { bookingRouter } from "./routes/booking.routes.js";
 import { paymentRouter } from "./routes/payment.routes.js";
 import { globalRateLimit } from "./middlewares/rate-limit.middleware.js";
 import { organizerReportRouter } from "./routes/organizer-report.routes.js";
+import { organizerApplicationRouter } from "./routes/organizer-application.routes.js";
 
 const app = express();
 
@@ -28,6 +29,7 @@ app.use("/api", healthRouter);
 app.use("/api", globalRateLimit);
 app.use("/api", authRouter);
 app.use("/api", organizerReportRouter);
+app.use("/api", organizerApplicationRouter);
 app.use("/api", venueRouter);
 app.use("/api", eventRouter);
 app.use("/api", seatHoldRouter);
