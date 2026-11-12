@@ -326,7 +326,7 @@ function DiscoveryContent({
 
       <div className={home ? "events-home__results" : "events-page__results"}>
         <div className="events-results__heading">
-          <h2>{home ? "Upcoming events" : "Events"}</h2>
+          <h2>{home ? "Recommended events" : "Events"}</h2>
           {!loading && result ? (
             <span>
               {result.pagination.total}{" "}

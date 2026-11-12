@@ -9,6 +9,8 @@ interface SeatSelectionSummaryProps {
   onRemoveSeat: (seatId: string) => void;
   onContinue: () => void;
   continueMessage: string;
+  continueLabel?: string;
+  continueLoading?: boolean;
 }
 
 export function SeatSelectionSummary({
@@ -16,6 +18,8 @@ export function SeatSelectionSummary({
   onRemoveSeat,
   onContinue,
   continueMessage,
+  continueLabel = "Continue",
+  continueLoading = false,
 }: SeatSelectionSummaryProps) {
   return (
     <aside className="seat-selection-summary" aria-labelledby="selection-summary-title">
@@ -57,17 +61,18 @@ export function SeatSelectionSummary({
           <p className="seat-selection-summary__disclaimer">
             Amounts are shown in the seat prices’ units; the API does not provide
             currency or fees. Final availability and price are confirmed by the
-            backend later.
+            server when you hold the seats.
           </p>
         </>
       )}
       <Button
         type="button"
         size="large"
-        disabled={selectedSeats.length === 0}
+        loading={continueLoading}
+        disabled={selectedSeats.length === 0 || continueLoading}
         onClick={onContinue}
       >
-        Continue
+        {continueLabel}
       </Button>
       {continueMessage ? (
         <p className="seat-selection-summary__message" role="status">

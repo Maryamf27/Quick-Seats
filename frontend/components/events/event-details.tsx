@@ -2,16 +2,27 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/error-state";
 import { LoadingState } from "@/components/ui/states";
 import { SeatMap } from "@/components/seats/seat-map";
 import { SeatSelectionSummary } from "@/components/seats/seat-selection-summary";
+import { HoldPanel } from "@/components/checkout/hold-panel";
+import { useToast } from "@/components/ui/toast";
 import { ApiError } from "@/lib/api/errors";
 import { eventsApi } from "@/lib/api/events";
-import type { EventRecord, EventSeat, EventVenueSummary } from "@/lib/api/types";
+import { bookingsApi } from "@/lib/api/endpoints/bookings";
+import type {
+  EventRecord,
+  EventSeat,
+  EventVenueSummary,
+  SeatHoldResult,
+} from "@/lib/api/types";
+import { useAuth } from "@/lib/auth/auth-context";
+import { isSafeCheckoutUrl, savePendingBookingId } from "@/lib/checkout/pending";
 import {
   MAX_SEATS_PER_HOLD,
   toggleSeatSelection,
@@ -70,6 +81,18 @@ function EventDetailsContent({ event }: { event: EventRecord }) {
   );
   const [selectedSeats, setSelectedSeats] = useState<EventSeat[]>([]);
   const [selectionMessage, setSelectionMessage] = useState("");
+  const [hold, setHold] = useState<SeatHoldResult | null>(null);
+  const [heldSeats, setHeldSeats] = useState<EventSeat[]>([]);
+  const [holding, setHolding] = useState(false);
+  const [paying, setPaying] = useState(false);
+  const [releasing, setReleasing] = useState(false);
+  const [holdMessage, setHoldMessage] = useState("");
+  // While we own a hold (or are creating one) the live "seat:held" echo of our
+  // own hold must not strip those seats from the selection or show an error.
+  const holdActive = useRef(false);
+  const { status: authStatus, accessToken } = useAuth();
+  const { notify } = useToast();
+  const router = useRouter();
   const venue = getVenue(event.venueId);
   const startTime = new Date(event.startDate);
   const endTime = new Date(event.endDate);
@@ -97,13 +120,92 @@ function EventDetailsContent({ event }: { event: EventRecord }) {
     );
   }
 
-  function continueToNextStep() {
-    if (selectedSeatIds.length === 0) {
+  async function holdSelectedSeats() {
+    if (selectedSeatIds.length === 0 || holding) {
       return;
     }
-    setSelectionMessage(
-      "Your seat choices are kept on this page only. The next phase will connect them to a real seat hold; nothing has been reserved.",
-    );
+    if (authStatus !== "authenticated" || !accessToken) {
+      router.push(`/login?next=${encodeURIComponent(`/events/${event._id}`)}`);
+      return;
+    }
+    const snapshot = selectedSeats;
+    holdActive.current = true;
+    setHolding(true);
+    setSelectionMessage("");
+    try {
+      const result = await eventsApi.holdSeats(event._id, selectedSeatIds, accessToken);
+      setHold(result);
+      setHeldSeats(snapshot);
+      setSelectedSeats([]);
+      setHoldMessage("");
+    } catch (error: unknown) {
+      holdActive.current = false;
+      if (error instanceof ApiError && error.status === 409) {
+        setSelectionMessage(
+          "One or more of those seats was just taken by someone else. Pick different seats.",
+        );
+      } else if (error instanceof ApiError && error.status === 429) {
+        setSelectionMessage("Too many attempts — wait a few seconds and try again.");
+      } else {
+        setSelectionMessage(getEventError(error));
+      }
+    } finally {
+      setHolding(false);
+    }
+  }
+
+  const clearHold = useCallback(() => {
+    holdActive.current = false;
+    setHold(null);
+    setHeldSeats([]);
+    setHoldMessage("");
+  }, []);
+
+  const handleHoldExpired = useCallback(() => {
+    clearHold();
+    notify("Your seat hold expired. Pick your seats again.", "warning");
+  }, [clearHold, notify]);
+
+  async function releaseHeldSeats() {
+    if (!hold || !accessToken) {
+      return;
+    }
+    setReleasing(true);
+    try {
+      await eventsApi.releaseHold(event._id, hold.holdId, accessToken);
+      clearHold();
+      notify("Seats released.", "info");
+    } catch (error: unknown) {
+      setHoldMessage(getEventError(error));
+    } finally {
+      setReleasing(false);
+    }
+  }
+
+  async function payForHold() {
+    if (!hold || !accessToken) {
+      return;
+    }
+    setPaying(true);
+    setHoldMessage("");
+    try {
+      const checkout = await bookingsApi.checkout(
+        { eventId: event._id, holdId: hold.holdId },
+        accessToken,
+      );
+      if (!isSafeCheckoutUrl(checkout.checkoutUrl)) {
+        throw new Error("unexpected checkout url");
+      }
+      savePendingBookingId(checkout.bookingId);
+      window.location.assign(checkout.checkoutUrl);
+    } catch (error: unknown) {
+      setPaying(false);
+      setHoldMessage(
+        error instanceof ApiError
+          ? error.message
+          : "Checkout could not be started. Please try again.",
+      );
+    }
   }
 
   return (
@@ -112,7 +214,14 @@ function EventDetailsContent({ event }: { event: EventRecord }) {
         <Link href="/events">← Back to events</Link>
       </nav>
 
-      <header className="event-detail-hero">
+      <header
+        className="event-detail-hero"
+        style={
+          isSafeImageUrl(event.posterUrl)
+            ? ({ "--poster": `url(${JSON.stringify(event.posterUrl)})` } as CSSProperties)
+            : undefined
+        }
+      >
         <div className="event-detail-hero__media">
           {!imageUnavailable && isSafeImageUrl(event.posterUrl) ? (
             <Image
@@ -152,7 +261,7 @@ function EventDetailsContent({ event }: { event: EventRecord }) {
               : "Venue details unavailable"}
           </p>
           <a className="event-detail-hero__jump" href="#event-seats">
-            Explore seats
+            Book tickets
           </a>
         </div>
       </header>
@@ -211,6 +320,9 @@ function EventDetailsContent({ event }: { event: EventRecord }) {
             selectedSeats={selectedSeats}
             onToggleSeat={toggleSeat}
             onSeatsUnavailable={(seatIds) => {
+              if (holdActive.current) {
+                return;
+              }
               const unavailable = new Set(seatIds);
               setSelectedSeats((seats) =>
                 seats.filter((seat) => !unavailable.has(seat.id)),
@@ -220,19 +332,34 @@ function EventDetailsContent({ event }: { event: EventRecord }) {
               );
             }}
           />
-          <SeatSelectionSummary
-            selectedSeats={selectedSeats}
-            onRemoveSeat={(seatId) => {
-              setSelectedSeats((seats) => seats.filter((seat) => seat.id !== seatId));
-              setSelectionMessage("");
-            }}
-            onContinue={continueToNextStep}
-            continueMessage={selectionMessage}
-          />
+          {hold ? (
+            <HoldPanel
+              hold={hold}
+              seats={heldSeats}
+              paying={paying}
+              releasing={releasing}
+              message={holdMessage}
+              onPay={() => void payForHold()}
+              onRelease={() => void releaseHeldSeats()}
+              onExpired={handleHoldExpired}
+            />
+          ) : (
+            <SeatSelectionSummary
+              selectedSeats={selectedSeats}
+              onRemoveSeat={(seatId) => {
+                setSelectedSeats((seats) => seats.filter((seat) => seat.id !== seatId));
+                setSelectionMessage("");
+              }}
+              onContinue={() => void holdSelectedSeats()}
+              continueLabel={authStatus === "authenticated" ? "Hold these seats" : "Sign in to hold seats"}
+              continueLoading={holding}
+              continueMessage={selectionMessage}
+            />
+          )}
         </div>
         <p className="event-seat-selection__backend-note">
-          Selection is not a reservation. The backend remains the source of
-          truth and must recheck seat status and price before booking.
+          Selecting is not reserving: seats are only yours once the hold succeeds,
+          and booked once payment is confirmed by the server.
         </p>
         <Button href="/events" variant="secondary">
           Browse other events

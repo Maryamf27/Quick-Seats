@@ -1,0 +1,118 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { LoadingState } from "@/components/ui/states";
+import { bookingsApi } from "@/lib/api/endpoints/bookings";
+import type { BookingStatusResult } from "@/lib/api/types";
+import { useAuth } from "@/lib/auth/auth-context";
+import { clearPendingBookingId, readPendingBookingId } from "@/lib/checkout/pending";
+
+const POLL_MS = 2000;
+const MAX_POLLS = 30; // ~60s; the webhook normally lands in a second or two
+
+type View =
+  | { kind: "loading" }
+  | { kind: "no-booking" }
+  | { kind: "result"; result: BookingStatusResult }
+  | { kind: "timeout" }
+  | { kind: "error"; message: string };
+
+
+export function BookingStatus() {
+  const { accessToken } = useAuth();
+  const [view, setView] = useState<View>({ kind: "loading" });
+  const polls = useRef(0);
+
+  useEffect(() => {
+    if (!accessToken) {
+      return;
+    }
+    const bookingId = readPendingBookingId();
+    if (!bookingId) {
+      setView({ kind: "no-booking" });
+      return;
+    }
+
+    let cancelled = false;
+    let timer: number | undefined;
+
+    const poll = async () => {
+      try {
+        const result = await bookingsApi.status(bookingId, accessToken);
+        if (cancelled) return;
+        const settled =
+          result.status !== "PENDING" || result.paymentStatus === "PAID";
+        if (settled) {
+          clearPendingBookingId();
+          setView({ kind: "result", result });
+          return;
+        }
+        polls.current += 1;
+        if (polls.current >= MAX_POLLS) {
+          setView({ kind: "timeout" });
+          return;
+        }
+        timer = window.setTimeout(poll, POLL_MS);
+      } catch {
+        if (!cancelled) {
+          setView({ kind: "error", message: "We couldn’t check your booking status." });
+        }
+      }
+    };
+    void poll();
+
+    return () => {
+      cancelled = true;
+      if (timer) window.clearTimeout(timer);
+    };
+  }, [accessToken]);
+
+  if (view.kind === "loading") {
+    return <LoadingState label="Confirming your payment with the server…" />;
+  }
+
+  let title = "";
+  let body = "";
+  let tone: "success" | "warning" | "danger" = "warning";
+
+  if (view.kind === "no-booking") {
+    title = "Thanks — check your bookings";
+    body = "We couldn’t tell which booking you just paid for in this tab. Your bookings page shows the latest status.";
+  } else if (view.kind === "timeout") {
+    title = "Still waiting for confirmation";
+    body = "Your payment is processing. This can take a moment; check My bookings shortly. If it doesn’t confirm, you’ll be refunded automatically.";
+  } else if (view.kind === "error") {
+    title = "Couldn’t check status";
+    body = view.message;
+    tone = "danger";
+  } else if (view.result.status === "CONFIRMED" && view.result.paymentStatus === "PAID") {
+    title = "You’re going!";
+    body = "Payment confirmed and your seats are booked.";
+    tone = "success";
+  } else if (view.result.requiresRefund) {
+    title = "Payment received after your hold expired";
+    body =
+      view.result.refundStatus === "SUCCEEDED"
+        ? "The seats were no longer held for you, so your payment was refunded in full."
+        : "The seats were no longer held for you, so your payment is being refunded.";
+    tone = "warning";
+  } else {
+    title = `Booking ${view.result.status.toLowerCase()}`;
+    body = "This booking did not complete. No seats were booked.";
+    tone = "danger";
+  }
+
+  return (
+    <section className="page-shell booking-result" role="status">
+      <Badge tone={tone}>{tone === "success" ? "Confirmed" : tone === "danger" ? "Not completed" : "Needs attention"}</Badge>
+      <h1 className="auth-page__title">{title}</h1>
+      <p className="auth-page__description">{body}</p>
+      <div className="booking-result__actions">
+        <Button href="/bookings">View my bookings</Button>
+        <Button href="/events" variant="secondary">Browse events</Button>
+      </div>
+    </section>
+  );
+}

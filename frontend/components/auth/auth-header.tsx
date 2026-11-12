@@ -1,51 +1,49 @@
 "use client";
 
 import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { HeaderSearch } from "@/components/layout/header-search";
 import { useAuth } from "@/lib/auth/auth-context";
-import { getRoleLabel } from "@/lib/auth/role-label";
 import { SignOutButton } from "./sign-out-button";
+
+const CATEGORIES = ["Concert", "Sports", "Comedy", "Theatre", "Festival", "Workshop"];
 
 export function AuthHeader() {
   const { status, user } = useAuth();
 
   return (
     <header className="site-header">
-      <div className="page-shell site-header__inner">
-        <Link className="wordmark" href="/" aria-label="QuickSeats home">
-          quickseats
-        </Link>
-        <nav className="site-nav" aria-label="Main navigation">
-          <Link className="site-nav__link site-nav__link--secondary" href="/#about">
-            Our point of view
+      <div className="topbar">
+        <div className="page-shell topbar__inner">
+          <Link className="logo" href="/" aria-label="QuickSeats home">
+            <span className="logo__mark" aria-hidden="true" />
+            <span>quick<b>seats</b></span>
           </Link>
-          <Link className="site-nav__link" href="/#events">
-            Discover
-          </Link>
-          {status === "authenticated" && user ? (
-            <>
-              <Badge>{getRoleLabel(user.role)}</Badge>
-              <Button href="/account" size="small" variant="secondary">
-                Account
-              </Button>
-              <SignOutButton
-                size="small"
-                variant="dark"
-              />
-            </>
-          ) : status === "unauthenticated" ? (
-            <>
-              <Button href="/login" size="small" variant="secondary">
-                Sign in
-              </Button>
-              <Button href="/register" size="small">
-                Create account
-              </Button>
-            </>
-          ) : null}
-        </nav>
+          <HeaderSearch />
+          <nav className="topbar__actions" aria-label="Account">
+            {status === "authenticated" && user ? (
+              <>
+                <Link className="topbar__link" href="/bookings">My bookings</Link>
+                <Link className="topbar__link" href="/account">Hi, {user.fullName.split(" ")[0]}</Link>
+                <SignOutButton size="small" variant="secondary" />
+              </>
+            ) : status === "unauthenticated" ? (
+              <>
+                <Link className="topbar__link" href="/register">Create account</Link>
+                <Button href="/login" size="small">Sign in</Button>
+              </>
+            ) : null}
+          </nav>
+        </div>
       </div>
+      <nav className="catbar" aria-label="Event categories">
+        <div className="page-shell catbar__inner">
+          <Link href="/events">All events</Link>
+          {CATEGORIES.map((c) => (
+            <Link key={c} href={`/events?category=${encodeURIComponent(c)}`}>{c}</Link>
+          ))}
+        </div>
+      </nav>
     </header>
   );
 }

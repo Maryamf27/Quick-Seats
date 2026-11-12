@@ -612,6 +612,9 @@ export function SeatMap({
         </div>
       ) : result ? (
         <>
+          <div className="seat-map-stage" aria-hidden="true">
+            <span>Stage this way</span>
+          </div>
           <div className="seat-map-sections">
             {rows.map(({ section, rows: sectionRows }) => (
               <section className="seat-map-section" key={section}>

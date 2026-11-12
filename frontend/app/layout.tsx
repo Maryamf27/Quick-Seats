@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import { Inter, Playfair_Display } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
+import { SiteFooter } from "@/components/layout/site-footer";
 import { ToastProvider } from "@/components/ui/toast";
 import { AuthProvider } from "@/lib/auth/auth-context";
 
@@ -9,26 +10,23 @@ const inter = Inter({
   subsets: ["latin"],
 });
 
-const playfairDisplay = Playfair_Display({
-  variable: "--font-playfair",
-  subsets: ["latin"],
-  display: "swap",
-});
-
 export const metadata: Metadata = {
   title: {
-    default: "QuickSeats — Find the moments worth leaving home for",
+    default: "QuickSeats — Book live events instantly",
     template: "%s | QuickSeats",
   },
-  description: "A considered way to discover live events and shared experiences.",
+  description: "Discover live events and book your seats in seconds.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${inter.variable} ${playfairDisplay.variable}`}>
+    <html lang="en" className={inter.variable}>
       <body>
         <ToastProvider>
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider>
+            {children}
+            <SiteFooter />
+          </AuthProvider>
         </ToastProvider>
       </body>
     </html>
