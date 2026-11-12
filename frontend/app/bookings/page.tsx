@@ -1,16 +1,5 @@
-import { AuthHeader } from "@/components/auth/auth-header";
-import { ProtectedRoute } from "@/components/auth/route-guards";
-import { MyBookings } from "@/components/checkout/my-bookings";
+import { redirect } from "next/navigation";
 
 export default function Page() {
-  return (
-    <>
-      <AuthHeader />
-      <main>
-        <ProtectedRoute>
-          <MyBookings />
-        </ProtectedRoute>
-      </main>
-    </>
-  );
+  redirect("/dashboard/bookings");
 }
