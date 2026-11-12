@@ -20,7 +20,16 @@ function money(amount: number, currency: string | null): string {
   }
 }
 
+function paymentFailed(b: MyBooking): boolean {
+  return b.status === "PENDING" && b.paymentStatus === "FAILED";
+}
+
+function statusLabel(b: MyBooking): string {
+  return paymentFailed(b) ? "PAYMENT DECLINED" : b.status;
+}
+
 function tone(b: MyBooking): "success" | "warning" | "danger" {
+  if (paymentFailed(b)) return "danger";
   if (b.status === "CONFIRMED") return "success";
   if (b.status === "PENDING") return "warning";
   return "danger";
@@ -72,7 +81,7 @@ export function MyBookings() {
           <li key={b.id} className="my-bookings__item">
             <div className="my-bookings__head">
               <h2>{b.event?.title ?? "Event"}</h2>
-              <Badge tone={tone(b)}>{b.status}</Badge>
+              <Badge tone={tone(b)}>{statusLabel(b)}</Badge>
             </div>
             <p className="my-bookings__meta">
               {b.event ? new Date(b.event.startDate).toLocaleString() : ""}
