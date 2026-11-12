@@ -42,6 +42,12 @@ function slugify(title: string): string {
   return slug || "event";
 }
 
+async function listPublishedCategories(): Promise<string[]> {
+  const values = await EventModel.distinct("category", { status: "PUBLISHED" }).exec();
+  return [...new Set(values.map((category) => category.trim()).filter(Boolean))]
+    .sort((left, right) => left.localeCompare(right));
+}
+
 async function createWithUniqueSlug(
   input: {
     title: string;
@@ -125,6 +131,7 @@ export async function listEvents(query: EventListQuery) {
       if (venues.length === 0) {
         return {
           events: [],
+          categories: await listPublishedCategories(),
           pagination: {
             page: query.page,
             limit: query.limit,
@@ -137,7 +144,7 @@ export async function listEvents(query: EventListQuery) {
     }
 
     const sortDirection = query.order === "asc" ? 1 : -1;
-    const [events, total] = await Promise.all([
+    const [events, total, categories] = await Promise.all([
       EventModel.find(filter)
         .sort({ [query.sortBy]: sortDirection })
         .skip((query.page - 1) * query.limit)
@@ -145,10 +152,34 @@ export async function listEvents(query: EventListQuery) {
         .lean()
         .exec(),
       EventModel.countDocuments(filter).exec(),
+      listPublishedCategories(),
     ]);
+    const venueIds = [...new Set(events.map((event) => event.venueId.toString()))];
+    const eventObjectIds = events.map((event) => event._id);
+    const [venues, seatPrices] = eventObjectIds.length > 0
+      ? await Promise.all([
+          VenueModel.find({ _id: { $in: venueIds } }).select("name address sections.price").lean().exec(),
+          SeatModel.aggregate<{ _id: Types.ObjectId; startingPrice: number }>([
+            { $match: { eventId: { $in: eventObjectIds } } },
+            { $group: { _id: "$eventId", startingPrice: { $min: "$price" } } },
+          ]).exec(),
+        ])
+      : [[], []];
+    const venueById = new Map(venues.map((venue) => [venue._id.toString(), venue]));
+    const seatPriceByEvent = new Map(seatPrices.map((row) => [row._id.toString(), row.startingPrice]));
 
     return {
-      events,
+      events: events.map((event) => {
+        const venue = venueById.get(event.venueId.toString());
+        const prices = venue?.sections.map((section) => section.price).filter(Number.isFinite) ?? [];
+        return {
+          ...event,
+          venueId: venue ? { _id: venue._id, name: venue.name, address: venue.address } : event.venueId,
+          startingPrice: seatPriceByEvent.get(event._id.toString()) ?? (prices.length > 0 ? Math.min(...prices) : null),
+          currency: env.STRIPE_CURRENCY,
+        };
+      }),
+      categories,
       pagination: {
         page: query.page,
         limit: query.limit,

@@ -4,6 +4,7 @@ import type { ApiErrorResponse, ApiSuccessResponse } from "./types";
 export type QueryValue = string | number | boolean | null | undefined;
 export type QueryParams = Record<string, QueryValue>;
 export const API_UNAUTHORIZED_EVENT = "quickseats:unauthorized";
+const REQUEST_TIMEOUT_MS = 15_000;
 
 export interface ApiRequestOptions extends Omit<RequestInit, "body" | "credentials"> {
   accessToken?: string;
@@ -110,6 +111,11 @@ function isAbortError(error: unknown): boolean {
   );
 }
 
+function isTimeoutError(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "name" in error &&
+    (error.name === "TimeoutError" || error.name === "AbortError");
+}
+
 async function request<T>(
   method: string,
   path: string,
@@ -139,13 +145,15 @@ async function request<T>(
   }
 
   let response: Response;
+  const timeoutSignal = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+  const requestSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
   try {
     response = await fetch(buildUrl(path, query), {
       ...requestOptions,
       method,
       headers,
       body: requestBody,
-      signal,
+      signal: requestSignal,
       credentials: "omit",
       cache: requestOptions.cache ?? "no-store",
     });
@@ -153,9 +161,16 @@ async function request<T>(
     if (error instanceof ApiError) {
       throw error;
     }
-    if (signal?.aborted || isAbortError(error)) {
+    if (signal?.aborted) {
       throw error;
     }
+    if (isTimeoutError(error)) {
+      throw new ApiError({
+        kind: "timeout",
+        message: "The request took too long. Check your connection and try again.",
+      });
+    }
+    if (isAbortError(error)) throw error;
     throw new ApiError({
       kind: "network",
       message: "Unable to reach the QuickSeats service. Check your connection and try again.",
@@ -189,6 +204,9 @@ async function request<T>(
   } catch (error: unknown) {
     if (error instanceof ApiError) {
       throw error;
+    }
+    if (timeoutSignal.aborted && !signal?.aborted) {
+      throw new ApiError({ kind: "timeout", message: "The request took too long. Check your connection and try again." });
     }
     throw new ApiError({
       kind: "response",

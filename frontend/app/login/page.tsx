@@ -5,6 +5,7 @@ export const metadata: Metadata = {
   title: "Sign in",
 };
 
-export default function LoginPage() {
-  return <LoginForm />;
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ reason?: string }> }) {
+  const params = await searchParams;
+  return <LoginForm sessionExpired={params.reason === "session-expired"} />;
 }

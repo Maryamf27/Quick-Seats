@@ -15,6 +15,7 @@ import { API_UNAUTHORIZED_EVENT } from "@/lib/api/client";
 import { authApi } from "@/lib/api/auth";
 import type { LoginInput, RegisterInput } from "@/lib/api/auth";
 import type { SafeUser } from "@/lib/api/types";
+import { useToast } from "@/components/ui/toast";
 import {
   clearAccessToken,
   readAccessToken,
@@ -47,6 +48,7 @@ function makeSessionStorageError(): ApiError {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const { notify } = useToast();
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [user, setUser] = useState<SafeUser | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
@@ -74,6 +76,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setStatus("authenticated");
       } catch (error: unknown) {
         if (error instanceof ApiError && error.status === 401) {
+          notify("Your sign-in expired. Please sign in again.", "warning");
+          try { window.sessionStorage.setItem("quickseats-session-expired", "1"); } catch { /* continue to clear the invalid session */ }
           try {
             clearAccessToken();
           } catch {
@@ -95,7 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     restoreRequest.current = request;
     return request;
-  }, []);
+  }, [notify]);
 
   useEffect(() => {
     void refreshSession();
@@ -103,6 +107,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     function handleUnauthorized() {
+      if (status === "authenticated") {
+        notify("Your sign-in expired. Please sign in again.", "warning");
+        try { window.sessionStorage.setItem("quickseats-session-expired", "1"); } catch { /* session cleanup still proceeds */ }
+      }
       try {
         clearAccessToken();
         setStatus("unauthenticated");
@@ -117,7 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       window.removeEventListener(API_UNAUTHORIZED_EVENT, handleUnauthorized);
     };
-  }, []);
+  }, [notify, status]);
 
   const signIn = useCallback(async (input: LoginInput): Promise<SafeUser> => {
     const result = await authApi.login(input);

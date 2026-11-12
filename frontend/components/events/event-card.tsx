@@ -19,6 +19,17 @@ export function EventCard({ event }: { event: EventRecord }) {
   const city = venue?.address?.city;
   const location = venue ? [venue.name, city].filter(Boolean).join(" · ") : "";
   const date = shortDate(event.startDate);
+  let startingPrice = "";
+  if (event.startingPrice !== undefined && event.startingPrice !== null && event.currency) {
+    try {
+      startingPrice = new Intl.NumberFormat(undefined, {
+        style: "currency",
+        currency: event.currency.toUpperCase(),
+      }).format(event.startingPrice);
+    } catch {
+      startingPrice = "";
+    }
+  }
 
   return (
     <article className="event-card">
@@ -60,6 +71,7 @@ export function EventCard({ event }: { event: EventRecord }) {
           <h3 className="event-card__title">{event.title}</h3>
           <p className="event-card__date">{longDate(event.startDate)}</p>
           {location ? <p className="event-card__location">{location}</p> : null}
+          {startingPrice ? <p className="event-card__price">From {startingPrice}</p> : null}
         </div>
       </Link>
     </article>

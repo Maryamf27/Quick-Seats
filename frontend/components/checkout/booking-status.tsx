@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { LoadingState } from "@/components/ui/states";
 import { bookingsApi } from "@/lib/api/endpoints/bookings";
+import { ApiError } from "@/lib/api/errors";
 import type { BookingStatusResult } from "@/lib/api/types";
 import { useAuth } from "@/lib/auth/auth-context";
 import { clearPendingBookingId, readPendingBookingId } from "@/lib/checkout/pending";
@@ -23,20 +24,21 @@ type View =
 export function BookingStatus() {
   const { accessToken } = useAuth();
   const [view, setView] = useState<View>({ kind: "loading" });
+  const [attempt, setAttempt] = useState(0);
   const polls = useRef(0);
 
   useEffect(() => {
     if (!accessToken) {
       return;
     }
-    const bookingId = readPendingBookingId();
-    if (!bookingId) {
-      setView({ kind: "no-booking" });
-      return;
-    }
-
+    polls.current = 0;
     let cancelled = false;
     let timer: number | undefined;
+    const bookingId = readPendingBookingId();
+    if (!bookingId) {
+      timer = window.setTimeout(() => { if (!cancelled) setView({ kind: "no-booking" }); }, 0);
+      return () => { cancelled = true; if (timer) window.clearTimeout(timer); };
+    }
 
     const poll = async () => {
       try {
@@ -55,9 +57,9 @@ export function BookingStatus() {
           return;
         }
         timer = window.setTimeout(poll, POLL_MS);
-      } catch {
+      } catch (error: unknown) {
         if (!cancelled) {
-          setView({ kind: "error", message: "We couldn’t check your booking status." });
+          setView({ kind: "error", message: error instanceof ApiError ? error.message : "Booking status could not be checked." });
         }
       }
     };
@@ -67,7 +69,12 @@ export function BookingStatus() {
       cancelled = true;
       if (timer) window.clearTimeout(timer);
     };
-  }, [accessToken]);
+  }, [accessToken, attempt]);
+
+  function checkAgain() {
+    setView({ kind: "loading" });
+    setAttempt((value) => value + 1);
+  }
 
   if (view.kind === "loading") {
     return <LoadingState label="Confirming your payment with the server…" />;
@@ -110,6 +117,7 @@ export function BookingStatus() {
       <h1 className="auth-page__title">{title}</h1>
       <p className="auth-page__description">{body}</p>
       <div className="booking-result__actions">
+        {view.kind === "timeout" || view.kind === "error" ? <Button type="button" variant="secondary" onClick={checkAgain}>Check status again</Button> : null}
         <Button href="/bookings">View my bookings</Button>
         <Button href="/events" variant="secondary">Browse events</Button>
       </div>

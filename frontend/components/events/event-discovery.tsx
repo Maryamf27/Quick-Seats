@@ -11,10 +11,10 @@ import type { FormEvent } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/error-state";
-import { LoadingState } from "@/components/ui/states";
+import { EventGridSkeleton, LoadingState } from "@/components/ui/states";
 import { eventsApi } from "@/lib/api/events";
 import { ApiError } from "@/lib/api/errors";
-import type { EventListResult, EventRecord } from "@/lib/api/types";
+import type { EventListResult } from "@/lib/api/types";
 import { EventCard } from "./event-card";
 import { EventSearchForm } from "./event-search-form";
 
@@ -82,11 +82,6 @@ function getResultError(error: unknown): string {
   return "Events could not be loaded. Please try again.";
 }
 
-function getCategories(events: EventRecord[]): string[] {
-  return [...new Set(events.map((event) => event.category.trim()).filter(Boolean))]
-    .sort((left, right) => left.localeCompare(right));
-}
-
 function DiscoveryContent({
   home = false,
 }: {
@@ -103,7 +98,7 @@ function DiscoveryContent({
     () => ({
       ...toQuery(filters),
       page: home ? 1 : filters.page,
-      limit: home ? 6 : DISCOVERY_PAGE_SIZE,
+      limit: home ? 100 : DISCOVERY_PAGE_SIZE,
     }),
     [filters, home],
   );
@@ -155,7 +150,7 @@ function DiscoveryContent({
   }, [query, requestKey]);
 
   const pageEvents = useMemo(() => result?.events ?? [], [result]);
-  const categories = useMemo(() => getCategories(pageEvents), [pageEvents]);
+  const categories = result?.categories ?? [];
   const hasActiveFilters = Boolean(
     filters.search ||
       filters.category ||
@@ -295,9 +290,9 @@ function DiscoveryContent({
         </section>
       ) : null}
 
-      {!home && categories.length > 0 ? (
-        <nav className="event-categories" aria-label="Categories in these results">
-          <span>Categories in these results</span>
+      {categories.length > 0 ? (
+        <nav className="event-categories" aria-label="Browse events by category">
+          <span>{home ? "Browse by category" : "Categories"}</span>
           <div className="event-categories__list">
             <Button
               type="button"
@@ -336,7 +331,7 @@ function DiscoveryContent({
         </div>
 
         {loading && !result ? (
-          <LoadingState label="Finding events…" />
+          <EventGridSkeleton count={home ? 6 : 8} />
         ) : error && !result ? (
           <ErrorState
             title="Events are unavailable right now"
@@ -366,7 +361,7 @@ function DiscoveryContent({
               </p>
             ) : null}
             <div className={home ? "event-grid event-grid--home" : "event-grid"}>
-              {pageEvents.map((event) => (
+              {(home ? pageEvents.slice(0, 6) : pageEvents).map((event) => (
                 <EventCard key={event._id} event={event} />
               ))}
             </div>

@@ -24,7 +24,14 @@ export function ProtectedRoute({
   useEffect(() => {
     if (status === "unauthenticated") {
       const next = encodeURIComponent(pathname || "/account");
-      router.replace(`/login?next=${next}`);
+      let reason = "";
+      try {
+        if (window.sessionStorage.getItem("quickseats-session-expired") === "1") {
+          window.sessionStorage.removeItem("quickseats-session-expired");
+          reason = "&reason=session-expired";
+        }
+      } catch { /* continue to sign-in even when storage is unavailable */ }
+      router.replace(`/login?next=${next}${reason}`);
     }
   }, [pathname, router, status]);
 

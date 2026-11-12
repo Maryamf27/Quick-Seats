@@ -18,6 +18,7 @@ export function HeroCarousel() {
   const [events, setEvents] = useState<EventRecord[] | null>(null);
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
+  const [failedImages, setFailedImages] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
     const controller = new AbortController();
@@ -79,7 +80,7 @@ export function HeroCarousel() {
             aria-roledescription="slide"
             aria-label={`${i + 1} of ${count}`}
           >
-            {image ? (
+            {image && !failedImages.has(event._id) ? (
               <Image
                 src={image}
                 alt=""
@@ -88,6 +89,7 @@ export function HeroCarousel() {
                 unoptimized
                 priority={i === 0}
                 className="hero-slide__image"
+                onError={() => setFailedImages((current) => new Set(current).add(event._id))}
               />
             ) : (
               <div

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { HeaderSearch } from "@/components/layout/header-search";
 import { useAuth } from "@/lib/auth/auth-context";
@@ -10,6 +11,7 @@ const CATEGORIES = ["Concert", "Sports", "Comedy", "Theatre", "Festival", "Works
 
 export function AuthHeader() {
   const { status, user } = useAuth();
+  const [mobileCategoriesOpen, setMobileCategoriesOpen] = useState(false);
 
   return (
     <header className="site-header">
@@ -21,6 +23,9 @@ export function AuthHeader() {
           </Link>
           <HeaderSearch />
           <nav className="topbar__actions" aria-label="Account">
+            <button className="topbar__menu-toggle" type="button" aria-expanded={mobileCategoriesOpen} aria-controls="event-category-navigation" onClick={() => setMobileCategoriesOpen((open) => !open)}>
+              {mobileCategoriesOpen ? "Close menu" : "Browse"}
+            </button>
             {status === "authenticated" && user ? (
               <>
                 <Link className="topbar__link" href="/bookings">My bookings</Link>
@@ -36,11 +41,11 @@ export function AuthHeader() {
           </nav>
         </div>
       </div>
-      <nav className="catbar" aria-label="Event categories">
+      <nav id="event-category-navigation" className={`catbar${mobileCategoriesOpen ? " catbar--open" : ""}`} aria-label="Event categories">
         <div className="page-shell catbar__inner">
-          <Link href="/events">All events</Link>
+          <Link href="/events" onClick={() => setMobileCategoriesOpen(false)}>All events</Link>
           {CATEGORIES.map((c) => (
-            <Link key={c} href={`/events?category=${encodeURIComponent(c)}`}>{c}</Link>
+            <Link key={c} href={`/events?category=${encodeURIComponent(c)}`} onClick={() => setMobileCategoriesOpen(false)}>{c}</Link>
           ))}
         </div>
       </nav>

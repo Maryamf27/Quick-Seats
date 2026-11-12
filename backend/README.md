@@ -318,6 +318,31 @@ idempotency. Validate the full workflow in Stripe Test mode before enabling
 live payments. This repository has not connected to Stripe Test mode or a
 deployed webhook.
 
+## Seed demo events
+
+In a non-production environment, run `npm run seed:events` from `backend/`.
+The seed checks its Unsplash poster URLs before connecting to MongoDB, then
+requires an existing `ORGANIZER` account. Create that account through the
+normal application and admin approval flow first. The script reuses or creates
+five Karachi, Lahore, and Islamabad demo venues, inserts 20 future published
+events with stable unique slugs, and generates seats from each venue's existing
+sections and prices. It uses the configured `MONGODB_URI`, refuses
+`NODE_ENV=production`, and requires the URI to name a specific database (it
+will not use MongoDB's implicit `test` database). It does not modify existing
+event records, and verifies the event count, category, date, status, and poster
+URL before it exits. Running it again should add no duplicate events; existing
+seed events and their seats are left in place.
+
+Event posters are remote Unsplash image URLs stored in the Event model's
+existing `posterUrl` field. Event cards show a category fallback if a remote
+image later becomes unavailable. Categories are lowercase strings from the
+seed data (`arts`, `business`, `festival`, `food`, `music`, `networking`,
+`photography`, `sports`, `technology`, `theatre`, and `workshop`); the existing
+public `GET /api/events?category=...` endpoint provides filtering and
+pagination. The public list response also includes all published category
+values, so the discovery UI can show categories that are not on the current
+result page.
+
 ## Phase 10 audit and current test limits
 
 | Area | Audit result |

@@ -75,7 +75,9 @@ async function call(
       ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
       ...(options.body ? { "Content-Type": "application/json" } : {}),
     },
-    body: options.body ? JSON.stringify(options.body) : undefined,
+    body: options.body && method !== "GET" && method !== "HEAD"
+      ? JSON.stringify(options.body)
+      : undefined,
   });
   const payload = (await response.json()) as { success: boolean; message: string };
   return { status: response.status, payload };

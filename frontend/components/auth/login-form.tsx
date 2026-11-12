@@ -22,13 +22,13 @@ function getLoginError(error: unknown): string {
   return "We couldn’t sign you in. Please try again.";
 }
 
-export function LoginForm() {
+export function LoginForm({ sessionExpired = false }: { sessionExpired?: boolean }) {
   const { signIn } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fieldErrors, setFieldErrors] = useState<LoginFieldErrors>({});
-  const [formError, setFormError] = useState("");
+  const [formError, setFormError] = useState(sessionExpired ? "Your sign-in expired. Please sign in again to continue." : "");
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {

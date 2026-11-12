@@ -36,6 +36,7 @@ interface ListBody {
   message: string;
   data: {
     events: Array<{ _id: string; title: string; status: string; category: string }>;
+    categories: string[];
     pagination: { page: number; limit: number; total: number; totalPages: number };
   };
 }
@@ -145,6 +146,8 @@ test(
       assert.equal(all.success, true);
       assert.equal(all.message, "Events retrieved successfully");
       assert.deepEqual(all.data.pagination, { page: 1, limit: 12, total: 3, totalPages: 1 });
+      assert.ok(all.data.categories.includes(category.toLowerCase()));
+      assert.ok(all.data.categories.includes(otherCategory.toLowerCase()));
 
       // 3 + 4: published events are returned, drafts are not.
       assert.deepEqual(

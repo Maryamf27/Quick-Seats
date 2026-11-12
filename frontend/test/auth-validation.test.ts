@@ -53,8 +53,10 @@ test("preserves only safe same-origin return destinations", () => {
     getSafeReturnPath("/account?tab=profile#details", origin),
     "/account?tab=profile#details",
   );
-  assert.equal(getSafeReturnPath("https://attacker.example", origin), "/account");
-  assert.equal(getSafeReturnPath("//attacker.example/path", origin), "/account");
-  assert.equal(getSafeReturnPath("/login?next=/account", origin), "/account");
-  assert.equal(getSafeReturnPath(null, origin), "/account");
+  assert.equal(getSafeReturnPath("https://attacker.example", origin), "/dashboard");
+  assert.equal(getSafeReturnPath("//attacker.example/path", origin), "/dashboard");
+  assert.equal(getSafeReturnPath("/login?next=/account", origin), "/dashboard");
+  assert.equal(getSafeReturnPath(null, origin), "/dashboard");
+  assert.equal(getSafeReturnPath(null, origin, "ORGANIZER"), "/organizer/dashboard");
+  assert.equal(getSafeReturnPath(null, origin, "ADMIN"), "/admin/dashboard");
 });

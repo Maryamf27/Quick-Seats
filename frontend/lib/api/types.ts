@@ -76,9 +76,9 @@ export interface Venue {
 export interface EventVenueSummary {
   _id: string;
   name: string;
-  description: string;
+  description?: string;
   address: VenueAddress;
-  capacity: number;
+  capacity?: number;
 }
 
 export interface EventRecord {
@@ -93,6 +93,8 @@ export interface EventRecord {
   endDate: string;
   status: EventStatus;
   posterUrl?: string;
+  startingPrice?: number | null;
+  currency?: string;
   seatsGeneratedAt?: string;
   createdAt: string;
   updatedAt: string;
@@ -100,6 +102,7 @@ export interface EventRecord {
 
 export interface EventListResult {
   events: EventRecord[];
+  categories: string[];
   pagination: Pagination;
 }
 

@@ -13,6 +13,14 @@ export function LoadingState({
   );
 }
 
+export function EventGridSkeleton({ count = 6 }: { count?: number }) {
+  return (
+    <div className="event-grid-skeleton" role="status" aria-label="Loading events">
+      {Array.from({ length: count }, (_, index) => <div className="event-skeleton" key={index} aria-hidden="true"><span /><div><i /><i /><i /></div></div>)}
+    </div>
+  );
+}
+
 export function EmptyState({
   title,
   description,
