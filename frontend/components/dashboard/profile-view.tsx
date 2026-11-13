@@ -16,7 +16,7 @@ function messageFor(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
 }
 
-export function ProfileView() {
+export function ProfileForms() {
   const { user, accessToken, updateUser } = useAuth();
   const { notify } = useToast();
   const [fullName, setFullName] = useState(user?.fullName ?? "");
@@ -75,15 +75,7 @@ export function ProfileView() {
   }
 
   return (
-    <section className="dashboard-section">
-      <header className="dashboard-heading">
-        <div>
-          <span className="eyebrow">Your account</span>
-          <h1>Profile settings</h1>
-          <p>Manage your QuickSeats account details.</p>
-        </div>
-      </header>
-
+    <>
       <dl className="profile-details">
         <div><dt>Email address</dt><dd>{user.email}</dd></div>
         <div><dt>Account type</dt><dd>{user.role}</dd></div>
@@ -103,6 +95,21 @@ export function ProfileView() {
         <Input label="Confirm new password" type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} autoComplete="new-password" error={passwordError} />
         <Button type="submit" loading={savingPassword} disabled={savingPassword}>Change password</Button>
       </form>
+    </>
+  );
+}
+
+export function ProfileView() {
+  return (
+    <section className="dashboard-section">
+      <header className="dashboard-heading">
+        <div>
+          <span className="eyebrow">Your account</span>
+          <h1>Profile settings</h1>
+          <p>Manage your QuickSeats account details.</p>
+        </div>
+      </header>
+      <ProfileForms />
     </section>
   );
 }
