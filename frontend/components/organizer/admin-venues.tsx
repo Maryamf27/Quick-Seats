@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Button } from "@/components/ui/button";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ErrorState } from "@/components/ui/error-state";
 import { Input } from "@/components/ui/input";
 import { EmptyState, LoadingState } from "@/components/ui/states";
@@ -21,6 +22,7 @@ function errorText(error: unknown, fallback: string): string {
 export function AdminVenues() {
   const { accessToken } = useAuth();
   const { notify } = useToast();
+  const { confirm, dialog } = useConfirmDialog();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState("");
@@ -39,7 +41,7 @@ export function AdminVenues() {
 
   async function remove(venue: Venue) {
     if (!accessToken || deleting) return;
-    if (!window.confirm(`Delete "${venue.name}"? This cannot be undone.`)) return;
+    if (!(await confirm({ title: "Delete this venue?", description: `“${venue.name}” will be permanently deleted. This cannot be undone.`, confirmLabel: "Delete venue" }))) return;
     setDeleting(venue._id);
     try {
       await venuesApi.delete(venue._id, accessToken);
@@ -101,6 +103,7 @@ export function AdminVenues() {
             ) : null}
           </>
         )}
+      {dialog}
     </section>
   );
 }

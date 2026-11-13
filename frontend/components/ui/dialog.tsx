@@ -8,6 +8,7 @@ export interface DialogProps {
   onClose: () => void;
   title: string;
   description?: string;
+  role?: "dialog" | "alertdialog";
   children: ReactNode;
 }
 
@@ -16,6 +17,7 @@ export function Dialog({
   onClose,
   title,
   description,
+  role = "dialog",
   children,
 }: DialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -40,6 +42,7 @@ export function Dialog({
     <dialog
       ref={dialogRef}
       className="ui-dialog"
+      role={role}
       aria-labelledby={titleId}
       aria-describedby={descriptionId}
       onClose={onClose}

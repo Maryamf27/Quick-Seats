@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ErrorState } from "@/components/ui/error-state";
 import { EmptyState, LoadingState } from "@/components/ui/states";
 import { eventsApi } from "@/lib/api/endpoints/events";
@@ -38,6 +39,7 @@ function venueName(event: EventRecord): string {
 export function OrganizerEvents({ compact = false }: { compact?: boolean }) {
   const { accessToken } = useAuth();
   const { notify } = useToast();
+  const { confirm, dialog } = useConfirmDialog();
   const [deletingId, setDeletingId] = useState("");
   const [eventState, setEventState] = useState<{
     key: string;
@@ -91,7 +93,7 @@ export function OrganizerEvents({ compact = false }: { compact?: boolean }) {
 
   async function deleteEvent(event: EventRecord) {
     if (!accessToken || deletingId) return;
-    if (!window.confirm(`Delete "${event.title}"? This permanently removes the event and its unsold seats.`)) return;
+    if (!(await confirm({ title: "Delete this event?", description: `“${event.title}” and its unsold seats will be permanently removed. This cannot be undone.`, confirmLabel: "Delete event" }))) return;
     setDeletingId(event._id);
     try {
       await eventsApi.delete(event._id, accessToken);
@@ -202,11 +204,20 @@ export function OrganizerEvents({ compact = false }: { compact?: boolean }) {
                       {event.status}
                     </Badge>
                   </div>
-                  <div className="organizer-event-card__meta">
-                    <span>{row ? `${row.ticketsSold} tickets sold` : "Tickets sold unavailable"}</span>
-                    <span>{row ? `${row.bookings} paid bookings` : "Bookings unavailable"}</span>
-                    <span>{revenue}</span>
-                  </div>
+                  <dl className="organizer-event-card__meta">
+                    <div>
+                      <dt>Tickets sold</dt>
+                      <dd>{row ? row.ticketsSold.toLocaleString() : "Unavailable"}</dd>
+                    </div>
+                    <div>
+                      <dt>Paid bookings</dt>
+                      <dd>{row ? row.bookings.toLocaleString() : "Unavailable"}</dd>
+                    </div>
+                    <div>
+                      <dt>Revenue</dt>
+                      <dd>{revenue}</dd>
+                    </div>
+                  </dl>
                   <div className="organizer-actions">
                     {event.status === "PUBLISHED" ? (
                       <Link href={`/events/${event._id}`}>View public event</Link>
@@ -257,6 +268,7 @@ export function OrganizerEvents({ compact = false }: { compact?: boolean }) {
           Published {published} · Drafts {drafts} on this page. Booking and revenue figures include confirmed, paid bookings in the last 366 days.
         </p>
       ) : null}
+      {dialog}
     </section>
   );
 }
