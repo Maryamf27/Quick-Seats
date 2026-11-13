@@ -12,6 +12,7 @@ const links = [
   ["/admin/users", "Users"],
   ["/admin/organizers", "Organizers"],
   ["/admin/events", "Events"],
+  ["/admin/venues", "Venues"],
   ["/admin/bookings", "Bookings"],
   ["/admin/analytics", "Analytics"],
   ["/admin/organizer-applications", "Organizer applications"],
@@ -33,7 +34,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
           </div>
           <nav aria-label="Platform management">
             {links.map(([href, label]) => (
-              <Link key={href} href={href} className={pathname === href ? "is-active" : undefined} aria-current={pathname === href ? "page" : undefined}>
+              <Link key={href} href={href} className={(pathname === href || pathname.startsWith(`${href}/`)) ? "is-active" : undefined} aria-current={(pathname === href || pathname.startsWith(`${href}/`)) ? "page" : undefined}>
                 {label}
               </Link>
             ))}
