@@ -152,7 +152,6 @@ function DiscoveryContent({
   const pageEvents = useMemo(() => result?.events ?? [], [result]);
   const categories = result?.categories ?? [];
   const hasActiveFilters = Boolean(
-    filters.search ||
       filters.category ||
       filters.city ||
       filters.from ||
@@ -185,7 +184,15 @@ function DiscoveryContent({
   }
 
   function clearFilters() {
-    router.push(pathname, { scroll: false });
+    updateFilters({
+      category: "",
+      city: "",
+      from: "",
+      to: "",
+      sortBy: "startDate",
+      order: "asc",
+      page: 1,
+    });
   }
 
   function applyCity(event: FormEvent<HTMLFormElement>) {
@@ -196,37 +203,36 @@ function DiscoveryContent({
     }
   }
 
+  const isSearchResults = !home && Boolean(filters.search.trim());
   const eventsSection = (
     <>
-      {home ? (
-        <div className="discovery-intro">
-          <div>
-            <span className="eyebrow">Good things are happening</span>
-            <h2 className="section-heading">Find your next favourite memory.</h2>
+      {isSearchResults ? (
+        <header className="discovery-search-header">
+          <div className="discovery-search-header__copy">
+            <span className="eyebrow">QuickSeats event guide</span>
+            <h1>Search results</h1>
+            <p>Results for <strong>"{filters.search}"</strong>{!loading && result ? ` · ${result.pagination.total} ${result.pagination.total === 1 ? "event" : "events"}` : ""}</p>
           </div>
-          <p className="discovery-intro__body">
-            Browse upcoming events drawn directly from the QuickSeats event
-            listings.
-          </p>
-        </div>
+          <div className="discovery-search-header__form">
+            <EventSearchForm key={filters.search} initialSearch={filters.search} compact />
+            <Button type="button" variant="secondary" size="small" onClick={() => updateFilters({ search: "" })}>
+              Clear search
+            </Button>
+          </div>
+        </header>
       ) : (
-        <div className="events-page__intro">
-          <span className="eyebrow">The live calendar</span>
-          <h1 className="events-page__title">Find your next unforgettable experience.</h1>
-          <p className="events-page__description">
-            Search published events, then narrow by category, city, date, or
-            order.
-          </p>
-          <EventSearchForm
-            key={filters.search}
-            initialSearch={filters.search}
-            compact
-          />
-        </div>
+        <header className={home ? "discovery-editorial discovery-editorial--home" : "discovery-editorial"}>
+          <span className="eyebrow">DISCOVER WHAT'S HAPPENING</span>
+          <h1>Find your next unforgettable experience.</h1>
+          <p>From live music to the moments worth going out for, find events happening near you.</p>
+          <EventSearchForm key={filters.search} initialSearch={filters.search} compact />
+        </header>
       )}
 
       {!home ? (
-        <section className="event-filters" aria-label="Filter events">
+        <details className="event-filter-panel" open>
+          <summary><span>Filters</span><span className="event-filter-panel__hint">Category, city and dates</span></summary>
+          <section className="event-filters" aria-label="Filter events">
           <form
             className="event-filter__city"
             key={filters.city}
@@ -287,12 +293,13 @@ function DiscoveryContent({
               Clear filters
             </Button>
           ) : null}
-        </section>
+          </section>
+        </details>
       ) : null}
 
       {categories.length > 0 ? (
         <nav className="event-categories" aria-label="Browse events by category">
-          <span>{home ? "Browse by category" : "Categories"}</span>
+          <span>{home ? "Popular categories" : "Browse by category"}</span>
           <div className="event-categories__list">
             <Button
               type="button"
@@ -319,9 +326,18 @@ function DiscoveryContent({
         </nav>
       ) : null}
 
+      {!home && (filters.category || filters.city || filters.from || filters.to) ? (
+        <div className="event-active-filters" aria-label="Active filters">
+          {filters.category ? <button type="button" onClick={() => updateFilters({ category: "" })}>{filters.category}<span aria-hidden="true"> x</span><span className="visually-hidden">Remove category filter</span></button> : null}
+          {filters.city ? <button type="button" onClick={() => updateFilters({ city: "" })}>{filters.city}<span aria-hidden="true"> x</span><span className="visually-hidden">Remove city filter</span></button> : null}
+          {filters.from ? <button type="button" onClick={() => updateFilters({ from: "" })}>From {filters.from}<span aria-hidden="true"> x</span><span className="visually-hidden">Remove start date filter</span></button> : null}
+          {filters.to ? <button type="button" onClick={() => updateFilters({ to: "" })}>Until {filters.to}<span aria-hidden="true"> x</span><span className="visually-hidden">Remove end date filter</span></button> : null}
+        </div>
+      ) : null}
+
       <div className={home ? "events-home__results" : "events-page__results"}>
         <div className="events-results__heading">
-          <h2>{home ? "Recommended events" : "Events"}</h2>
+          <h2>{home ? "Upcoming events" : isSearchResults ? "Events matching your search" : "Upcoming events"}</h2>
           {!loading && result ? (
             <span>
               {result.pagination.total}{" "}
@@ -340,7 +356,7 @@ function DiscoveryContent({
           />
         ) : pageEvents.length === 0 ? (
           <div className="events-empty">
-            <h3>{hasActiveFilters ? "No events match those filters." : "No published events yet."}</h3>
+            <h3>{filters.search ? "No events found for this search." : hasActiveFilters ? "No events match those filters." : "No published events yet."}</h3>
             <p>
               {hasActiveFilters
                 ? "Try another search or clear some filters."
