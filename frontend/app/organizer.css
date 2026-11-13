@@ -2,3 +2,18 @@
 
 .admin-filters{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem}.admin-filters input[type=search],.admin-filters select{border:1px solid var(--border);border-radius:6px;background:var(--surface);padding:.55rem .7rem;color:var(--foreground);font:inherit;font-size:.875rem}.admin-filters input[type=search]{min-width:min(100%,260px);flex:1 1 220px}.admin-filters input:focus-visible,.admin-filters select:focus-visible{outline:3px solid #d9795b;outline-offset:2px}.admin-overview .organizer-stat-grid article a{color:var(--primary);font-size:.85rem;font-weight:700;text-decoration:none}.profile-form{display:grid;max-width:720px;gap:1rem;border:1px solid var(--border);border-radius:var(--radius-large);background:var(--surface);padding:var(--space-5);box-shadow:var(--shadow-small)}.profile-form h2{margin:0;color:var(--heading);font-family:var(--font-playfair),Georgia,serif;font-size:1.3rem}.profile-form .ui-button{justify-self:start}.organizer-table td .organizer-actions{flex-wrap:nowrap}
 .venue-section{display:grid;gap:.75rem;margin:0;border:1px solid var(--border);border-radius:8px;padding:1rem}.venue-section legend{padding-inline:.4rem;color:var(--heading);font-size:.85rem;font-weight:700}.organizer-form .organizer-subheading{font-size:1.2rem}
+
+@media (min-width: 641px){
+  .organizer-sidebar{position:sticky;top:1rem;align-self:start;max-height:calc(100svh - 2rem);overflow-y:auto;}
+}
+.organizer-content,.organizer-form,.organizer-form__grid{min-width:0;}
+.organizer-form__field select,.organizer-form input[type="datetime-local"]{box-sizing:border-box;width:100%;min-width:0;max-width:100%;}
+.organizer-form__field select{overflow:hidden;text-overflow:ellipsis;}
+.organizer-form input[type="datetime-local"]{font-size:clamp(.8rem,2.5vw,.95rem);}
+@media (max-width: 640px){
+  .organizer-shell{width:100%;}
+  .organizer-sidebar{position:static;max-height:none;overflow:visible;}
+  .organizer-form__grid{grid-template-columns:minmax(0,1fr);}
+  .organizer-form input[type="datetime-local"]{font-size:.82rem;}
+  .organizer-form__field select{white-space:normal;}
+}
