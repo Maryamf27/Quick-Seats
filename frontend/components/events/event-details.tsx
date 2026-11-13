@@ -90,7 +90,7 @@ function EventDetailsContent({ event }: { event: EventRecord }) {
   // While we own a hold (or are creating one) the live "seat:held" echo of our
   // own hold must not strip those seats from the selection or show an error.
   const holdActive = useRef(false);
-  const { status: authStatus, accessToken } = useAuth();
+  const { status: authStatus, accessToken, user } = useAuth();
   const { notify } = useToast();
   const router = useRouter();
   const venue = getVenue(event.venueId);
@@ -304,6 +304,16 @@ function EventDetailsContent({ event }: { event: EventRecord }) {
       </div>
 
       <hr className="section-rule" />
+      {user?.role === "ORGANIZER" ? (
+        <section className="event-seat-selection" aria-label="Ticket booking unavailable">
+          <aside className="seat-selection-summary" role="status">
+            <span className="eyebrow">Organizer account</span>
+            <h2>Ticket booking is for attendees.</h2>
+            <p>Organizers can manage their events, but cannot reserve or purchase tickets from an organizer account.</p>
+            <Button href="/organizer/events" variant="secondary">Manage your events</Button>
+          </aside>
+        </section>
+      ) : (
       <section className="event-seat-selection" id="event-seats" aria-label="Choose seats">
         <div className="event-seat-selection__intro">
           <span className="eyebrow">Plan your visit</span>
@@ -365,6 +375,7 @@ function EventDetailsContent({ event }: { event: EventRecord }) {
           Browse other events
         </Button>
       </section>
+      )}
     </div>
   );
 }

@@ -41,10 +41,11 @@ eventRouter.get("/events/:eventId/seats", eventDetailRateLimit, getEventSeatMapC
 eventRouter.post(
   "/events/:eventId/seats/hold",
   authenticate,
+  authorize("USER", "ADMIN"),
   seatHoldRateLimit,
   holdSeatsController,
 );
-eventRouter.post("/events/:eventId/seats/release", authenticate, releaseHoldController);
+eventRouter.post("/events/:eventId/seats/release", authenticate, authorize("USER", "ADMIN"), releaseHoldController);
 eventRouter
   .route("/events/:eventId")
   .get(eventDetailRateLimit, getEventController)

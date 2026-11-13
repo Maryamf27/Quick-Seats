@@ -28,7 +28,7 @@ export function AuthHeader() {
             </button>
             {status === "authenticated" && user ? (
               <>
-                <Link className="topbar__link" href="/bookings">My bookings</Link>
+                {user.role !== "ORGANIZER" ? <Link className="topbar__link" href="/bookings">My bookings</Link> : null}
                 <Link className="topbar__link" href="/account">Hi, {user.fullName.split(" ")[0]}</Link>
                 <SignOutButton size="small" variant="secondary" />
               </>
