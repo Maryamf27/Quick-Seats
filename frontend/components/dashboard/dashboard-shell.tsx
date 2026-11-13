@@ -26,7 +26,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
             <span><strong>{user?.fullName}</strong><small>{user?.email}</small></span>
           </div>
           <nav aria-label="Account navigation" className="dashboard__nav">
-            {links.map((link) => {
+            {links.filter((link) => user?.role !== "ORGANIZER" || link.href !== "/dashboard/bookings").map((link) => {
               const active = link.exact ? pathname === link.href : pathname.startsWith(link.href);
               return <Link key={link.href} href={link.href} aria-current={active ? "page" : undefined} className={active ? "is-active" : ""}>{link.label}</Link>;
             })}
