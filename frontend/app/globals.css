@@ -1751,6 +1751,13 @@ dialog:focus-visible {
   font-size: 0.875rem;
 }
 
+.ui-confirm-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
 .ui-icon-button {
   display: inline-grid;
   width: 44px;

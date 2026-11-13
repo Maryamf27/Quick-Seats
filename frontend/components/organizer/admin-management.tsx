@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/error-state";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { LoadingState } from "@/components/ui/states";
 import { useToast } from "@/components/ui/toast";
 import { adminApi } from "@/lib/api/endpoints/admin";
@@ -110,6 +111,7 @@ const date = (value: string) => new Date(value).toLocaleDateString();
 export function AdminUsers() {
   const { accessToken, user: me } = useAuth();
   const { notify } = useToast();
+  const { confirm, dialog } = useConfirmDialog();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [role, setRole] = useState<"" | "USER" | "ORGANIZER" | "ADMIN">("");
@@ -121,7 +123,7 @@ export function AdminUsers() {
 
   async function change(target: AdminUser, changes: { role?: "USER" | "ORGANIZER"; isSuspended?: boolean }) {
     if (!accessToken || busy) return;
-    if (changes.isSuspended && !window.confirm(`Suspend ${target.email}? They will be signed out of every request immediately.`)) return;
+    if (changes.isSuspended && !(await confirm({ title: "Suspend this user?", description: `${target.email} will be signed out and unable to access their account until restored.`, confirmLabel: "Suspend user" }))) return;
     setBusy(target._id);
     try {
       const updated = await adminApi.updateUser(target._id, changes, accessToken);
@@ -167,6 +169,7 @@ export function AdminUsers() {
             <Pager page={page} pagination={list.state.pagination} onChange={setPage} />
           </>
         )}
+      {dialog}
     </Section>
   );
 }
@@ -209,6 +212,7 @@ const EVENT_STATUSES = ["DRAFT", "PUBLISHED", "CANCELLED", "COMPLETED"] as const
 export function AdminEvents() {
   const { accessToken } = useAuth();
   const { notify } = useToast();
+  const { confirm, dialog } = useConfirmDialog();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
@@ -220,7 +224,7 @@ export function AdminEvents() {
 
   async function unpublish(target: AdminEventRow) {
     if (!accessToken || busy) return;
-    if (!window.confirm(`Unpublish "${target.title}"? It will disappear from public listings and return to draft.`)) return;
+    if (!(await confirm({ title: "Unpublish this event?", description: `“${target.title}” will be removed from public listings and returned to drafts.`, confirmLabel: "Unpublish event" }))) return;
     setBusy(target._id);
     try {
       const result = await adminApi.unpublishEvent(target._id, accessToken);
@@ -235,7 +239,7 @@ export function AdminEvents() {
 
   async function cancel(target: AdminEventRow) {
     if (!accessToken || busy) return;
-    if (!window.confirm(`Cancel "${target.title}"? Every confirmed booking will be cancelled and refunded. This cannot be undone.`)) return;
+    if (!(await confirm({ title: "Cancel this event?", description: `Every confirmed booking for “${target.title}” will be cancelled and refunded. This cannot be undone.`, confirmLabel: "Cancel event" }))) return;
     setBusy(target._id);
     try {
       const result = await adminApi.cancelEvent(target._id, accessToken);
@@ -287,6 +291,7 @@ export function AdminEvents() {
             <Pager page={page} pagination={list.state.pagination} onChange={setPage} />
           </>
         )}
+      {dialog}
     </Section>
   );
 }
