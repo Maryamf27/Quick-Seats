@@ -1,4 +1,5 @@
 import type { RequestHandler } from "express";
+import { cancelBooking } from "../services/booking-cancellation.service.js";
 import {
   createCheckout,
   getBookingById,
@@ -55,4 +56,15 @@ export const getMyBookingsController: RequestHandler = async (request, response)
   const query = parseInput(myBookingsQuerySchema, request.query);
   const result = await getMyBookings(userId, query);
   return sendSuccess(response, result, "Bookings retrieved successfully");
+};
+
+export const cancelBookingController: RequestHandler = async (request, response) => {
+  const { bookingId } = parseInput(bookingIdParamsSchema, request.params);
+  const userId = request.user?.id;
+  if (!userId) {
+    return response.status(401).json({ success: false, message: "Authentication required" });
+  }
+
+  const result = await cancelBooking(bookingId, userId);
+  return sendSuccess(response, result, "Booking cancelled");
 };

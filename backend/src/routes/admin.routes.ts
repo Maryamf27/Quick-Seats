@@ -1,12 +1,14 @@
 import { Router } from "express";
 import {
   adminAnalyticsController,
+  adminCancelEventController,
   adminGetUserController,
   adminListBookingsController,
   adminListEventsController,
   adminListOrganizersController,
   adminListUsersController,
   adminOverviewController,
+  adminUnpublishEventController,
   adminUpdateUserController,
 } from "../controllers/admin.controller.js";
 import { authenticate } from "../middlewares/auth.middleware.js";
@@ -23,3 +25,5 @@ adminRouter.get("/admin/organizers", adminListOrganizersController);
 adminRouter.get("/admin/events", adminListEventsController);
 adminRouter.get("/admin/bookings", adminListBookingsController);
 adminRouter.get("/admin/analytics", adminAnalyticsController);
+adminRouter.post("/admin/events/:eventId/unpublish", adminUnpublishEventController);
+adminRouter.post("/admin/events/:eventId/cancel", adminCancelEventController);

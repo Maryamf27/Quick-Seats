@@ -203,6 +203,14 @@ export interface MyBooking {
   createdAt: string;
 }
 
+export interface CancelBookingResult {
+  id: string;
+  status: BookingStatus;
+  paymentStatus: PaymentStatus;
+  refundStatus: RefundStatus;
+  requiresRefund: boolean;
+}
+
 export interface BookingListResult {
   bookings: MyBooking[];
   pagination: Pagination;

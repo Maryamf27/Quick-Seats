@@ -99,6 +99,13 @@ const environmentSchema = z.object({
   STRIPE_CHECKOUT_SUCCESS_URL: z.string().url(),
   STRIPE_CHECKOUT_CANCEL_URL: z.string().url(),
   PAYMENT_HOLD_DURATION_MINUTES: z.coerce.number().int().min(30).max(1440).default(30),
+  BOOKING_CANCELLATION_CUTOFF_HOURS: z.coerce.number().int().min(0).max(24 * 30).default(24),
+  // Outgoing email. Without SMTP_URL the mailer only logs what it would have sent, which is
+  // what you want locally and in CI.
+  SMTP_URL: z.string().trim().min(1).optional(),
+  EMAIL_FROM: z.string().trim().min(3).default("QuickSeats <no-reply@quickseats.local>"),
+  SALES_SUMMARY_EMAIL_CRON: z.string().trim().min(9).default("0 8 * * 1"),
+  SALES_SUMMARY_WINDOW_DAYS: z.coerce.number().int().min(1).max(60).default(7),
 }).superRefine((configuration, context) => {
   if (configuration.NODE_ENV !== "production") {
     return;

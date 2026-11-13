@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  cancelBookingController,
   checkoutController,
   getBookingController,
   getBookingStatusController,
@@ -13,5 +14,6 @@ export const bookingRouter = Router();
 bookingRouter.use(authenticate);
 bookingRouter.post("/checkout", checkoutRateLimit, checkoutController);
 bookingRouter.get("/my", getMyBookingsController);
+bookingRouter.post("/:bookingId/cancel", cancelBookingController);
 bookingRouter.get("/:bookingId/status", getBookingStatusController);
 bookingRouter.get("/:bookingId", getBookingController);

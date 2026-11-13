@@ -206,13 +206,46 @@ export function AdminOrganizers() {
 const EVENT_STATUSES = ["DRAFT", "PUBLISHED", "CANCELLED", "COMPLETED"] as const;
 
 export function AdminEvents() {
+  const { accessToken } = useAuth();
+  const { notify } = useToast();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
+  const [busy, setBusy] = useState("");
   const list = useAdminList<AdminEventRow>(async (token, signal) => {
     const result = await adminApi.events({ page, limit: 20, search: search || undefined, status: (status || undefined) as AdminEventRow["status"] | undefined }, token, { signal });
     return { items: result.events, pagination: result.pagination };
   }, [page, search, status]);
+
+  async function unpublish(target: AdminEventRow) {
+    if (!accessToken || busy) return;
+    if (!window.confirm(`Unpublish "${target.title}"? It will disappear from public listings and return to draft.`)) return;
+    setBusy(target._id);
+    try {
+      const result = await adminApi.unpublishEvent(target._id, accessToken);
+      list.patch((items) => items.map((item) => (item._id === target._id ? { ...item, status: result.status } : item)));
+      notify("Event unpublished.", "success");
+    } catch (error: unknown) {
+      notify(error instanceof ApiError && error.backendMessage ? error.backendMessage : "The event could not be unpublished.", "error");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function cancel(target: AdminEventRow) {
+    if (!accessToken || busy) return;
+    if (!window.confirm(`Cancel "${target.title}"? Every confirmed booking will be cancelled and refunded. This cannot be undone.`)) return;
+    setBusy(target._id);
+    try {
+      const result = await adminApi.cancelEvent(target._id, accessToken);
+      list.patch((items) => items.map((item) => (item._id === target._id ? { ...item, status: result.status } : item)));
+      notify(result.cancelledBookings > 0 ? `Event cancelled. ${result.cancelledBookings} booking${result.cancelledBookings === 1 ? "" : "s"} queued for refund.` : "Event cancelled.", "success");
+    } catch (error: unknown) {
+      notify(error instanceof ApiError && error.backendMessage ? error.backendMessage : "The event could not be cancelled.", "error");
+    } finally {
+      setBusy("");
+    }
+  }
 
   return (
     <Section title="Events" description="Every event on the platform, whatever its publication status.">
@@ -224,10 +257,11 @@ export function AdminEvents() {
       {list.error ? <ErrorState title="Couldn’t load events" description="The event directory could not be retrieved." onRetry={list.reload} />
         : !list.state ? <LoadingState label="Loading events…" /> : (
           <>
-            <Table head={["Event", "Organizer", "Venue", "Starts", "Status"]} empty="No events match these filters.">
+            <Table head={["Event", "Organizer", "Venue", "Starts", "Status", "Actions"]} empty="No events match these filters.">
               {list.state.items.map((item) => {
                 const organizer = typeof item.organizerId === "object" ? item.organizerId : null;
                 const venue = typeof item.venueId === "object" ? item.venueId : null;
+                const closed = item.status === "CANCELLED" || item.status === "COMPLETED";
                 return (
                   <tr key={item._id}>
                     <td>{item.title}<small>{item.category}</small></td>
@@ -235,6 +269,12 @@ export function AdminEvents() {
                     <td>{venue?.name ?? "—"}<small>{venue?.address?.city ?? ""}</small></td>
                     <td>{new Date(item.startDate).toLocaleString()}</td>
                     <td><Badge tone={item.status === "PUBLISHED" ? "success" : item.status === "DRAFT" ? "warning" : "default"}>{item.status}</Badge></td>
+                    <td>{closed ? <small>—</small> : (
+                      <div className="organizer-actions">
+                        {item.status === "PUBLISHED" ? <Button size="small" variant="secondary" disabled={Boolean(busy)} loading={busy === item._id} onClick={() => void unpublish(item)}>Unpublish</Button> : null}
+                        <Button size="small" variant="destructive" disabled={Boolean(busy)} onClick={() => void cancel(item)}>Cancel event</Button>
+                      </div>
+                    )}</td>
                   </tr>
                 );
               })}

@@ -1,4 +1,4 @@
-import { Types } from "mongoose";
+import mongoose, { Types } from "mongoose";
 import type { z } from "zod";
 import { BookingModel } from "../models/booking.model.js";
 import { EventModel } from "../models/event.model.js";
@@ -7,6 +7,7 @@ import { SeatModel } from "../models/seat.model.js";
 import { UserModel } from "../models/user.model.js";
 import { AppError } from "../utils/app-error.js";
 import { parseInput } from "../utils/validation.js";
+import { invalidateEventCache } from "./public-cache-invalidation.service.js";
 import { objectIdSchema } from "../validators/common.validator.js";
 import {
   adminAnalyticsQuerySchema,
@@ -354,4 +355,77 @@ export async function getAdminAnalytics(input: unknown) {
     categories: categories.map((row) => ({ category: row._id, events: row.events })),
     userGrowth: userGrowth.map((row) => ({ day: row._id, users: row.users })),
   };
+}
+
+/**
+ * Takes a published event offline without cancelling it. Refused when customers already hold
+ * confirmed bookings, because hiding an event those customers paid for would strand them;
+ * the admin has to cancel it instead, which refunds them.
+ */
+export async function unpublishEvent(eventIdValue: string) {
+  const eventId = new Types.ObjectId(parseInput(objectIdSchema, eventIdValue));
+  const event = await EventModel.findById(eventId).select("status").lean().exec();
+  if (!event) throw new AppError("Event not found", 404);
+  if (event.status !== "PUBLISHED") {
+    throw new AppError("Only published events can be unpublished", 409);
+  }
+  const hasConfirmed = await BookingModel.exists({ eventId, status: "CONFIRMED" }).exec();
+  if (hasConfirmed) {
+    throw new AppError(
+      "This event has confirmed bookings. Cancel it instead so customers are refunded.",
+      409,
+    );
+  }
+
+  const updated = await EventModel.findOneAndUpdate(
+    { _id: eventId, status: "PUBLISHED" },
+    { $set: { status: "DRAFT" } },
+    { new: true },
+  )
+    .lean()
+    .exec();
+  if (!updated) throw new AppError("Event changed while it was being unpublished", 409);
+  await invalidateEventCache(eventId.toString());
+  return { id: updated._id.toString(), status: updated.status };
+}
+
+/**
+ * Cancels an event and every confirmed booking on it. Each paid booking is flagged for a
+ * refund inside the same transaction; the refund itself is issued afterwards by the existing
+ * refund-retry job, so a Stripe outage cannot leave the event half-cancelled.
+ */
+export async function cancelEventAsAdmin(eventIdValue: string) {
+  const eventId = new Types.ObjectId(parseInput(objectIdSchema, eventIdValue));
+  const session = await mongoose.startSession();
+  let cancelledBookings = 0;
+
+  try {
+    await session.withTransaction(async () => {
+      const event = await EventModel.findById(eventId).session(session).select("status").lean().exec();
+      if (!event) throw new AppError("Event not found", 404);
+      if (event.status === "CANCELLED") throw new AppError("Event is already cancelled", 409);
+      if (event.status === "COMPLETED") throw new AppError("Completed events cannot be cancelled", 409);
+
+      const flipped = await EventModel.updateOne(
+        { _id: eventId, status: { $in: ["DRAFT", "PUBLISHED"] } },
+        { $set: { status: "CANCELLED" } },
+        { session },
+      ).exec();
+      if (flipped.modifiedCount !== 1) {
+        throw new AppError("Event changed while it was being cancelled", 409);
+      }
+
+      const refunded = await BookingModel.updateMany(
+        { eventId, status: "CONFIRMED", paymentStatus: "PAID" },
+        { $set: { status: "CANCELLED", requiresRefund: true, refundStatus: "PENDING" } },
+        { session },
+      ).exec();
+      cancelledBookings = refunded.modifiedCount;
+    });
+  } finally {
+    await session.endSession();
+  }
+
+  await invalidateEventCache(eventId.toString());
+  return { id: eventId.toString(), status: "CANCELLED" as const, cancelledBookings };
 }

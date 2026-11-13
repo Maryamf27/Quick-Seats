@@ -211,7 +211,7 @@ function DiscoveryContent({
           <div className="discovery-search-header__copy">
             <span className="eyebrow">QuickSeats event guide</span>
             <h1>Search results</h1>
-            <p>Results for <strong>"{filters.search}"</strong>{!loading && result ? ` · ${result.pagination.total} ${result.pagination.total === 1 ? "event" : "events"}` : ""}</p>
+            <p>Results for <strong>&ldquo;{filters.search}&rdquo;</strong>{!loading && result ? ` · ${result.pagination.total} ${result.pagination.total === 1 ? "event" : "events"}` : ""}</p>
           </div>
           <div className="discovery-search-header__form">
             <EventSearchForm key={filters.search} initialSearch={filters.search} compact />
@@ -222,7 +222,7 @@ function DiscoveryContent({
         </header>
       ) : (
         <header className={home ? "discovery-editorial discovery-editorial--home" : "discovery-editorial"}>
-          <span className="eyebrow">DISCOVER WHAT'S HAPPENING</span>
+          <span className="eyebrow">DISCOVER WHAT&rsquo;S HAPPENING</span>
           <h1>Find your next unforgettable experience.</h1>
           <p>From live music to the moments worth going out for, find events happening near you.</p>
           <EventSearchForm key={filters.search} initialSearch={filters.search} compact />

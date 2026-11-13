@@ -52,6 +52,12 @@ export const adminApi = {
   events(query: AdminEventQuery, token: string, options?: ApiRequestOptions): Promise<{ events: AdminEventRow[]; pagination: Pagination }> {
     return api.get("/admin/events", { ...options, query, accessToken: token });
   },
+  unpublishEvent(id: string, token: string, options?: ApiRequestOptions): Promise<{ id: string; status: EventStatus }> {
+    return api.post(`/admin/events/${encodeURIComponent(id)}/unpublish`, undefined, { ...options, accessToken: token });
+  },
+  cancelEvent(id: string, token: string, options?: ApiRequestOptions): Promise<{ id: string; status: EventStatus; cancelledBookings: number }> {
+    return api.post(`/admin/events/${encodeURIComponent(id)}/cancel`, undefined, { ...options, accessToken: token });
+  },
   bookings(query: AdminBookingQuery, token: string, options?: ApiRequestOptions): Promise<{ bookings: AdminBookingRow[]; pagination: Pagination }> {
     return api.get("/admin/bookings", { ...options, query, accessToken: token });
   },

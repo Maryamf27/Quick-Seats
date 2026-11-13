@@ -66,3 +66,5 @@ export const adminAnalyticsQuerySchema = z
     message: "from must be before to",
     path: ["from"],
   });
+
+export const adminEventIdParamsSchema = z.object({ eventId: objectIdSchema }).strict();

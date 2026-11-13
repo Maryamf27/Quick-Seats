@@ -1,5 +1,6 @@
 import type { RequestHandler } from "express";
 import {
+  cancelEventAsAdmin,
   getAdminAnalytics,
   getAdminOverview,
   getUserDetail,
@@ -7,12 +8,13 @@ import {
   listAllEvents,
   listOrganizers,
   listUsers,
+  unpublishEvent,
   updateUser,
 } from "../services/admin.service.js";
 import { AppError } from "../utils/app-error.js";
 import { sendSuccess } from "../utils/api-response.js";
 import { parseInput } from "../utils/validation.js";
-import { adminUserIdParamsSchema } from "../validators/admin.validator.js";
+import { adminEventIdParamsSchema, adminUserIdParamsSchema } from "../validators/admin.validator.js";
 
 function adminId(request: Parameters<RequestHandler>[0]): string {
   if (!request.user) throw new AppError("Authentication required", 401);
@@ -50,3 +52,13 @@ export const adminListBookingsController: RequestHandler = async (request, respo
 
 export const adminAnalyticsController: RequestHandler = async (request, response) =>
   sendSuccess(response, await getAdminAnalytics(request.query), "Analytics retrieved");
+
+export const adminUnpublishEventController: RequestHandler = async (request, response) => {
+  const { eventId } = parseInput(adminEventIdParamsSchema, request.params);
+  return sendSuccess(response, await unpublishEvent(eventId), "Event unpublished");
+};
+
+export const adminCancelEventController: RequestHandler = async (request, response) => {
+  const { eventId } = parseInput(adminEventIdParamsSchema, request.params);
+  return sendSuccess(response, await cancelEventAsAdmin(eventId), "Event cancelled");
+};

@@ -4,6 +4,7 @@ import type {
   BookingDetail,
   BookingListResult,
   BookingStatusResult,
+  CancelBookingResult,
   CheckoutResult,
 } from "../types";
 
@@ -42,6 +43,16 @@ export const bookingsApi = {
     options?: ApiRequestOptions,
   ): Promise<BookingDetail> {
     return api.get(`/bookings/${encodeURIComponent(bookingId)}`, {
+      ...options,
+      accessToken,
+    });
+  },
+  cancel(
+    bookingId: string,
+    accessToken: string,
+    options?: ApiRequestOptions,
+  ): Promise<CancelBookingResult> {
+    return api.post(`/bookings/${encodeURIComponent(bookingId)}/cancel`, undefined, {
       ...options,
       accessToken,
     });

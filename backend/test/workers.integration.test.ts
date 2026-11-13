@@ -56,6 +56,7 @@ test(
           "pending-refund-retry",
           "seat-hold-expiration",
           "seat-notification-outbox",
+          "weekly-organizer-sales-summary",
         ].sort(),
       );
     } finally {
@@ -66,6 +67,7 @@ test(
         "pending-refund-retry",
         "seat-hold-expiration",
         "seat-notification-outbox",
+        "weekly-organizer-sales-summary",
       ]) {
         await queue.removeJobScheduler(schedulerId);
       }

@@ -8,6 +8,7 @@ import {
   enqueuePendingOrganizerReports,
 } from "../services/organizer-report.service.js";
 import { retryPendingBookingRefunds } from "../services/refund.service.js";
+import { sendUpcomingSalesSummaries } from "../services/sales-summary-email.service.js";
 import { clearExpiredSeatHolds } from "../services/seat-expiration.service.js";
 import { dispatchPendingSeatNotifications } from "../services/seat-notification-outbox.service.js";
 import {
@@ -22,7 +23,8 @@ interface MaintenanceJobData {
     | "pending-bookings"
     | "refund-retries"
     | "seat-notifications"
-    | "report-recovery";
+    | "report-recovery"
+    | "sales-summary-email";
 }
 
 interface OrganizerReportJobData {
@@ -59,6 +61,8 @@ export async function startBackgroundWorkers(): Promise<() => Promise<void>> {
           return dispatchPendingSeatNotifications();
         case "report-recovery":
           return enqueuePendingOrganizerReports();
+        case "sales-summary-email":
+          return (await sendUpcomingSalesSummaries()).sent;
       }
     },
     { connection: maintenanceConnection, concurrency: 2 },
@@ -181,6 +185,15 @@ export async function startBackgroundWorkers(): Promise<() => Promise<void>> {
       {
         name: "scheduled-maintenance",
         data: { task: "report-recovery" },
+        opts: maintenanceRepeatOptions,
+      },
+    ),
+    maintenanceQueue.upsertJobScheduler(
+      "weekly-organizer-sales-summary",
+      { pattern: env.SALES_SUMMARY_EMAIL_CRON, tz: "UTC" },
+      {
+        name: "scheduled-maintenance",
+        data: { task: "sales-summary-email" },
         opts: maintenanceRepeatOptions,
       },
     ),
