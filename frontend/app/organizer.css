@@ -17,3 +17,14 @@
   .organizer-form input[type="datetime-local"]{font-size:.82rem;}
   .organizer-form__field select{white-space:normal;}
 }
+
+.admin-shell,.admin-main,.dashboard,.dashboard__main,.event-filter-panel,.event-filter-panel .event-filters{min-width:0;}
+.admin-filters{width:100%;min-width:0;flex-wrap:wrap;}
+.admin-filters select{box-sizing:border-box;min-width:0;max-width:100%;flex:1 1 180px;}
+.event-filter__control,.event-filter__control input[type="date"],.event-filter__control select{box-sizing:border-box;min-width:0;max-width:100%;}
+.event-filter__control input[type="date"]{width:100%;font-size:clamp(.75rem,2.8vw,.9rem);}
+@media(max-width:540px){
+  .admin-filters select,.admin-filters input[type="search"]{width:100%;min-width:0;flex-basis:100%;}
+  .admin-filters .ui-button{max-width:100%;}
+  .event-filter__control input[type="date"]{font-size:.82rem;padding-inline:.45rem;}
+}
