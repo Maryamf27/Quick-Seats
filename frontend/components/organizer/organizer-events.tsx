@@ -202,11 +202,20 @@ export function OrganizerEvents({ compact = false }: { compact?: boolean }) {
                       {event.status}
                     </Badge>
                   </div>
-                  <div className="organizer-event-card__meta">
-                    <span>{row ? `${row.ticketsSold} tickets sold` : "Tickets sold unavailable"}</span>
-                    <span>{row ? `${row.bookings} paid bookings` : "Bookings unavailable"}</span>
-                    <span>{revenue}</span>
-                  </div>
+                  <dl className="organizer-event-card__meta">
+                    <div>
+                      <dt>Tickets sold</dt>
+                      <dd>{row ? row.ticketsSold.toLocaleString() : "Unavailable"}</dd>
+                    </div>
+                    <div>
+                      <dt>Paid bookings</dt>
+                      <dd>{row ? row.bookings.toLocaleString() : "Unavailable"}</dd>
+                    </div>
+                    <div>
+                      <dt>Revenue</dt>
+                      <dd>{revenue}</dd>
+                    </div>
+                  </dl>
                   <div className="organizer-actions">
                     {event.status === "PUBLISHED" ? (
                       <Link href={`/events/${event._id}`}>View public event</Link>
