@@ -241,8 +241,8 @@ function EventDetailsContent({ event }: { event: EventRecord }) {
         </div>
         <div className="event-detail-hero__copy">
           <div className="event-detail-hero__badges">
-            <Badge>{event.category}</Badge>
-            <Badge tone="success">Published</Badge>
+            <Badge className="event-detail-hero__badge--category">{event.category}</Badge>
+            <Badge className="event-detail-hero__badge--published">Published</Badge>
           </div>
           <h1>{event.title}</h1>
           <p className="event-detail-hero__date">

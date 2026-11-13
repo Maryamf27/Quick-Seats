@@ -93,11 +93,11 @@ function SearchBar({ value, onSubmit, placeholder, children }: { value: string; 
   );
 }
 
-function Table({ head, children, empty }: { head: string[]; children: ReactNode[]; empty: string }) {
+function Table({ head, children, empty, className }: { head: string[]; children: ReactNode[]; empty: string; className?: string }) {
   if (children.length === 0) return <p className="organizer-empty">{empty}</p>;
   return (
     <div className="organizer-table-wrap">
-      <table className="organizer-table">
+      <table className={`organizer-table${className ? ` ${className}` : ""}`}>
         <thead><tr>{head.map((label) => <th key={label} scope="col">{label}</th>)}</tr></thead>
         <tbody>{children}</tbody>
       </table>
@@ -144,11 +144,12 @@ export function AdminUsers() {
       {list.error ? <ErrorState title="Couldn’t load users" description="The user directory could not be retrieved." onRetry={list.reload} />
         : !list.state ? <LoadingState label="Loading users…" /> : (
           <>
-            <Table head={["Name", "Role", "Status", "Joined", "Actions"]} empty="No users match these filters.">
-              {list.state.items.map((item) => {
+            <Table className="admin-users-table" head={["#", "Name", "Role", "Status", "Joined", "Actions"]} empty="No users match these filters.">
+              {list.state.items.map((item, index) => {
                 const locked = item.role === "ADMIN" || item._id === me?._id;
                 return (
                   <tr key={item._id}>
+                    <td>{(page - 1) * 20 + index + 1}</td>
                     <td>{item.fullName}<small>{item.email}</small></td>
                     <td>{item.role}</td>
                     <td>{item.isSuspended ? <Badge tone="danger">Suspended</Badge> : <Badge tone="success">Active</Badge>}</td>
@@ -257,28 +258,32 @@ export function AdminEvents() {
       {list.error ? <ErrorState title="Couldn’t load events" description="The event directory could not be retrieved." onRetry={list.reload} />
         : !list.state ? <LoadingState label="Loading events…" /> : (
           <>
-            <Table head={["Event", "Organizer", "Venue", "Starts", "Status", "Actions"]} empty="No events match these filters.">
+            {list.state.items.length === 0 ? <p className="organizer-empty">No events match these filters.</p> : <div className="admin-events-list" aria-label="Events">
               {list.state.items.map((item) => {
                 const organizer = typeof item.organizerId === "object" ? item.organizerId : null;
                 const venue = typeof item.venueId === "object" ? item.venueId : null;
                 const closed = item.status === "CANCELLED" || item.status === "COMPLETED";
                 return (
-                  <tr key={item._id}>
-                    <td>{item.title}<small>{item.category}</small></td>
-                    <td>{organizer?.fullName ?? "Unknown"}<small>{organizer?.email ?? ""}</small></td>
-                    <td>{venue?.name ?? "—"}<small>{venue?.address?.city ?? ""}</small></td>
-                    <td>{new Date(item.startDate).toLocaleString()}</td>
-                    <td><Badge tone={item.status === "PUBLISHED" ? "success" : item.status === "DRAFT" ? "warning" : "default"}>{item.status}</Badge></td>
-                    <td>{closed ? <small>—</small> : (
-                      <div className="organizer-actions">
+                  <article className="admin-event-card" key={item._id}>
+                    <div className="admin-event-card__heading">
+                      <div className="admin-event-card__title"><h2>{item.title}</h2><span>{item.category}</span></div>
+                      <Badge tone={item.status === "PUBLISHED" ? "success" : item.status === "DRAFT" ? "warning" : "default"}>{item.status}</Badge>
+                    </div>
+                    <dl className="admin-event-card__details">
+                      <div><dt>Organizer</dt><dd>{organizer?.fullName ?? "Unknown"}<small>{organizer?.email ?? ""}</small></dd></div>
+                      <div><dt>Venue</dt><dd>{venue?.name ?? "Venue unavailable"}<small>{venue?.address?.city ?? ""}</small></dd></div>
+                      <div><dt>Starts</dt><dd>{new Date(item.startDate).toLocaleString()}</dd></div>
+                    </dl>
+                    <div className="admin-event-card__actions">
+                      {closed ? <span className="admin-event-card__closed">No actions available</span> : <>
                         {item.status === "PUBLISHED" ? <Button size="small" variant="secondary" disabled={Boolean(busy)} loading={busy === item._id} onClick={() => void unpublish(item)}>Unpublish</Button> : null}
                         <Button size="small" variant="destructive" disabled={Boolean(busy)} onClick={() => void cancel(item)}>Cancel event</Button>
-                      </div>
-                    )}</td>
-                  </tr>
+                      </>}
+                    </div>
+                  </article>
                 );
               })}
-            </Table>
+            </div>}
             <Pager page={page} pagination={list.state.pagination} onChange={setPage} />
           </>
         )}

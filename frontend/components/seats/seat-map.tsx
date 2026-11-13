@@ -543,13 +543,25 @@ export function SeatMap({
       sectionRows.set(seat.row, rowSeats);
     }
 
-    return [...grouped].map(([section, sectionRows]) => ({
-      section,
-      rows: [...sectionRows].map(([row, seats]) => ({
-        row,
-        seats: seats.sort((left, right) => left.seatNumber - right.seatNumber),
-      })),
-    }));
+    // Sort sections so VIP is closest to the stage (top), then PREMIUM, then STANDARD
+    const SECTION_ORDER: Record<string, number> = { VIP: 0, PREMIUM: 1, STANDARD: 2 };
+    function getSectionPriority(section: string): number {
+      const upper = section.toUpperCase();
+      for (const [key, priority] of Object.entries(SECTION_ORDER)) {
+        if (upper.includes(key)) return priority;
+      }
+      return 99;
+    }
+
+    return [...grouped]
+      .map(([section, sectionRows]) => ({
+        section,
+        rows: [...sectionRows].map(([row, seats]) => ({
+          row,
+          seats: seats.sort((left, right) => left.seatNumber - right.seatNumber),
+        })),
+      }))
+      .sort((a, b) => getSectionPriority(a.section) - getSectionPriority(b.section));
   }, [result]);
 
   function retry() {

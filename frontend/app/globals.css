@@ -585,6 +585,20 @@ dialog:focus-visible {
   gap: var(--space-2);
 }
 
+/* Badges on the dark poster hero need solid white contrast */
+.event-detail-hero__badge--category {
+  background: rgb(255 255 255 / 20%);
+  border-color: rgb(255 255 255 / 35%);
+  color: #fff;
+}
+
+.event-detail-hero__badge--published {
+  background: rgb(52 116 90 / 90%);
+  border-color: rgb(52 116 90 / 60%);
+  color: #fff;
+  font-weight: 700;
+}
+
 .event-detail-hero__copy h1 {
   margin: var(--space-5) 0;
   color: var(--heading);
@@ -820,7 +834,11 @@ dialog:focus-visible {
   max-width: 100%;
   gap: var(--space-5);
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-inline: contain;
   padding-block: var(--space-6);
+  /* Prevent the panel itself from overflowing the viewport */
+  box-sizing: border-box;
 }
 
 .seat-map-section {
@@ -828,6 +846,7 @@ dialog:focus-visible {
   min-width: 100%;
   border: 1px solid var(--border);
   padding: var(--space-4);
+  border-radius: var(--radius-medium);
 }
 
 .seat-map-section h3 {
@@ -854,6 +873,7 @@ dialog:focus-visible {
   color: var(--muted-text-accessible);
   font-size: 0.75rem;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .seat-map-row__seats {
@@ -1575,6 +1595,50 @@ dialog:focus-visible {
   border-color: var(--semantic-danger);
 }
 
+.ui-input-control {
+  position: relative;
+  min-width: 0;
+}
+
+.ui-input--password {
+  padding-right: 3rem;
+}
+
+.ui-input__visibility {
+  position: absolute;
+  top: 50%;
+  right: .5rem;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  transform: translateY(-50%);
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-small);
+  background: transparent;
+  color: var(--muted-text-accessible);
+  cursor: pointer;
+}
+
+.ui-input__visibility:hover:not(:disabled) {
+  background: var(--surface-muted);
+  color: var(--primary);
+}
+
+.ui-input__visibility:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
+.ui-input__visibility svg {
+  width: 19px;
+  height: 19px;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .ui-field__hint,
 .ui-field__error {
   margin: 0;
@@ -1927,6 +1991,18 @@ dialog:focus-visible {
   .seat-map-pagination > span {
     order: -1;
     width: 100%;
+  }
+
+  /* Contain horizontal scroll inside panel only */
+  .seat-map-panel {
+    overflow: hidden;
+  }
+
+  .seat-map-sections {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    -webkit-overflow-scrolling: touch;
   }
 
   .discovery-hero {
@@ -2793,6 +2869,26 @@ h1, h2, h3 {
   .event-filter__control { min-width: 0; }
   .event-filter-panel .event-filters > .ui-button { justify-self: start; }
 }
+/* On narrow phones, stack all filter controls to a single column so the
+   native date-picker calendar and sort dropdown never overflow the viewport */
+@media (max-width: 540px) {
+  .event-filter-panel .event-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .event-filter__city {
+    grid-column: 1 / -1;
+  }
+  /* Full-width selects and date inputs keep them from pushing off-screen */
+  .event-filter__control input,
+  .event-filter__control select {
+    width: 100%;
+    min-width: 0;
+  }
+  /* Sort-by select: prevent the dropdown list overflowing right edge */
+  .event-filter__control select {
+    max-width: 100%;
+  }
+}
 @media (max-width: 480px) {
   .event-grid, .event-grid--home { grid-template-columns: minmax(0,1fr); }
   .home-section { padding-top: 1.5rem; }
@@ -2801,4 +2897,641 @@ h1, h2, h3 {
   .discovery-editorial .event-search > .ui-button { padding-inline: .8rem; }
   .discovery-search-header__form { align-items: stretch; flex-wrap: wrap; }
   .discovery-search-header__form .event-search { flex-basis: 100%; }
+
+  /* Smaller seats on very narrow phones so 10 seats still fit without scrolling */
+  .seat-map-row { grid-template-columns: 36px 1fr; gap: 4px; }
+  .seat-map-row__seats { gap: 4px; flex-wrap: wrap; }
+  .seat-map-seat { width: 32px; height: 32px; flex: 0 0 32px; font-size: 0.6rem; border-radius: 5px 5px 3px 3px; }
+  .seat-map-section { padding: var(--space-3); }
+  .seat-map-row__label { font-size: 0.65rem; }
+}
+
+/* Keep native date and select controls aligned with the QuickSeats theme. */
+.event-filter__control select,
+.organizer-form__field select,
+.admin-filters select {
+  color-scheme: light;
+  accent-color: var(--primary);
+}
+
+.event-filter__control select,
+.organizer-form__field select,
+.admin-filters select {
+  appearance: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-medium);
+  background-color: var(--surface);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='m4 6 4 4 4-4' stroke='%23666666' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right .75rem center;
+  background-size: 1rem;
+  padding-right: 2.4rem;
+  cursor: pointer;
+}
+
+.event-filter__control input[type="date"] {
+  color-scheme: light;
+  accent-color: var(--primary);
+  min-width: 0;
+  padding-inline: .65rem;
+}
+
+.event-filter__control input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: .72;
+  transition: opacity 140ms ease;
+}
+
+.event-filter__control input[type="date"]:hover::-webkit-calendar-picker-indicator {
+  opacity: 1;
+}
+
+.event-filter__control select:hover,
+.event-filter__control input[type="date"]:hover,
+.organizer-form__field select:hover,
+.admin-filters select:hover {
+  border-color: color-mix(in srgb, var(--primary) 55%, var(--border));
+}
+
+.event-filter__control select:focus-visible,
+.event-filter__control input[type="date"]:focus-visible,
+.organizer-form__field select:focus-visible,
+.admin-filters select:focus-visible {
+  border-color: var(--primary);
+  outline: 3px solid color-mix(in srgb, var(--primary) 20%, transparent);
+  outline-offset: 2px;
+}
+
+.event-filter__control select:disabled,
+.event-filter__control input[type="date"]:disabled,
+.organizer-form__field select:disabled {
+  background-color: var(--surface-muted);
+  color: var(--muted-text-accessible);
+  cursor: not-allowed;
+}
+
+/* Keep the global footer full-width and prevent long copy from widening its grid. */
+.site-footer {
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
+.site-footer__grid {
+  width: min(100% - var(--page-gutter) * 2, var(--content-width));
+  grid-template-columns: minmax(0, 1.4fr) repeat(2, minmax(0, 1fr)) minmax(0, 1.4fr);
+}
+
+.site-footer__grid > * {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 800px) {
+  .site-footer__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Admin workspace: reclaim table space when requested and avoid browser scrollbars. */
+.admin-shell--sidebar-closed {
+  grid-template-columns: 68px minmax(0, 1fr);
+}
+
+.admin-shell {
+  transition: grid-template-columns 220ms ease;
+}
+
+.admin-shell > .admin-sidebar {
+  min-width: 0;
+  overflow: hidden;
+  transition: padding 220ms ease;
+}
+
+.admin-sidebar__brand-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+  min-height: 40px;
+}
+
+.admin-shell--sidebar-closed .admin-sidebar {
+  align-items: center;
+  padding-inline: .6rem;
+}
+
+.admin-shell--sidebar-closed .admin-sidebar__brand-row {
+  justify-content: center;
+}
+
+.admin-shell--sidebar-closed .admin-sidebar__brand-row .organizer-brand,
+.admin-shell--sidebar-closed .admin-sidebar__identity,
+.admin-shell--sidebar-closed .admin-sidebar nav,
+.admin-shell--sidebar-closed .admin-sidebar__bottom {
+  display: none;
+}
+
+.admin-sidebar-toggle {
+  display: inline-grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-medium);
+  background: var(--surface);
+  padding: .45rem;
+  color: var(--heading);
+  cursor: pointer;
+  transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease;
+}
+
+.admin-sidebar-toggle svg {
+  width: 20px;
+  height: 20px;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.admin-sidebar-toggle:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.admin-events-table {
+  table-layout: fixed;
+}
+
+.admin-events-table th,
+.admin-events-table td {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.admin-events-table th:nth-child(1) { width: 19%; }
+.admin-events-table th:nth-child(2) { width: 17%; }
+.admin-events-table th:nth-child(3) { width: 17%; }
+.admin-events-table th:nth-child(4) { width: 18%; }
+.admin-events-table th:nth-child(5) { width: 12%; }
+.admin-events-table th:nth-child(6) { width: 17%; }
+.admin-events-table td .organizer-actions { gap: .45rem; }
+.admin-events-table td .ui-button { white-space: normal; }
+
+.organizer-table-wrap {
+  scrollbar-width: none;
+}
+
+.organizer-table-wrap::-webkit-scrollbar {
+  display: none;
+}
+
+@media (max-width: 1024px) {
+  .admin-events-table th:nth-child(2),
+  .admin-events-table td:nth-child(2),
+  .admin-events-table th:nth-child(3),
+  .admin-events-table td:nth-child(3) {
+    display: none;
+  }
+
+  .admin-events-table th:nth-child(1) { width: 29%; }
+  .admin-events-table th:nth-child(4) { width: 28%; }
+  .admin-events-table th:nth-child(5) { width: 17%; }
+  .admin-events-table th:nth-child(6) { width: 26%; }
+}
+
+@media (max-width: 600px) {
+  .admin-shell--sidebar-closed {
+    grid-template-columns: 52px minmax(0, 1fr);
+  }
+
+  .admin-shell--sidebar-closed .admin-sidebar {
+    padding-inline: .35rem;
+  }
+
+  .admin-events-table th:nth-child(4),
+  .admin-events-table td:nth-child(4) {
+    display: none;
+  }
+
+  .admin-events-table th:nth-child(1) { width: 38%; }
+  .admin-events-table th:nth-child(5) { width: 23%; }
+  .admin-events-table th:nth-child(6) { width: 39%; }
+  .admin-events-table td .organizer-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
+/* Admin user directory: stable, aligned columns with a quieter sequence column. */
+.admin-users-table {
+  table-layout: fixed;
+}
+
+.admin-users-table th,
+.admin-users-table td {
+  vertical-align: middle;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.admin-users-table th:first-child,
+.admin-users-table td:first-child {
+  width: 4%;
+  color: var(--muted-text-accessible);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-users-table th:nth-child(2) { width: 24%; }
+.admin-users-table th:nth-child(3) { width: 13%; }
+.admin-users-table th:nth-child(4) { width: 13%; }
+.admin-users-table th:nth-child(5) { width: 15%; }
+.admin-users-table th:nth-child(6) { width: 31%; }
+.admin-users-table td:nth-child(2) { color: var(--heading); font-weight: 600; }
+.admin-users-table td:nth-child(2) small { font-weight: 400; overflow-wrap: anywhere; }
+.admin-users-table td:nth-child(3),
+.admin-users-table td:nth-child(4),
+.admin-users-table td:nth-child(5) { color: var(--muted-text-accessible); }
+.admin-users-table td:last-child .organizer-actions { gap: .45rem; }
+.admin-users-table td:last-child .ui-button { min-height: 40px; white-space: normal; }
+
+@media (max-width: 760px) {
+  .admin-users-table th:nth-child(5),
+  .admin-users-table td:nth-child(5) { display: none; }
+  .admin-users-table th:nth-child(2) { width: 37%; }
+  .admin-users-table th:nth-child(3) { width: 17%; }
+  .admin-users-table th:nth-child(4) { width: 18%; }
+  .admin-users-table th:nth-child(6) { width: 28%; }
+  .admin-users-table td:last-child .organizer-actions { align-items: stretch; flex-direction: column; }
+}
+
+.admin-events-list {
+  display: grid;
+  gap: .85rem;
+}
+
+.admin-event-card {
+  display: grid;
+  min-width: 0;
+  gap: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-large);
+  background: var(--surface);
+  padding: 1.15rem 1.25rem;
+  box-shadow: var(--shadow-small);
+}
+
+.admin-event-card__heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.admin-event-card__title { min-width: 0; }
+.admin-event-card__title h2 { margin: 0; color: var(--heading); font-size: 1rem; line-height: 1.4; overflow-wrap: anywhere; }
+.admin-event-card__title span { display: block; margin-top: .2rem; color: var(--muted-text-accessible); font-size: .8rem; }
+.admin-event-card__status { flex: 0 0 auto; }
+.admin-event-card__details { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 1rem; margin: 0; }
+.admin-event-card__details > div { display: grid; min-width: 0; align-content: start; gap: .25rem; }
+.admin-event-card__details dt { color: var(--muted-text-accessible); font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.admin-event-card__details dd { min-width: 0; margin: 0; color: var(--heading); font-size: .86rem; overflow-wrap: anywhere; }
+.admin-event-card__details small { display: block; margin-top: .15rem; color: var(--muted-text-accessible); font-size: .78rem; }
+.admin-event-card__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .55rem; border-top: 1px solid var(--border); padding-top: .85rem; }
+.admin-event-card__closed { align-self: center; color: var(--muted-text-accessible); font-size: .82rem; }
+
+@media (max-width: 640px) {
+  .admin-event-card { padding: .9rem; }
+  .admin-event-card__details { grid-template-columns: repeat(2,minmax(0,1fr)); gap: .8rem; }
+  .admin-event-card__details > div:last-child { grid-column: 1 / -1; }
+  .admin-event-card__actions { justify-content: stretch; }
+  .admin-event-card__actions .ui-button { flex: 1 1 auto; }
+}
+
+/* Mobile admin navigation: show every destination without a clipped scroll row. */
+@media (max-width: 760px) {
+  .admin-shell:not(.admin-shell--sidebar-closed) {
+    grid-template-columns: minmax(0, 1fr);
+    gap: .75rem;
+  }
+
+  .admin-shell:not(.admin-shell--sidebar-closed) .admin-sidebar {
+    width: 100%;
+    min-width: 0;
+    padding: .85rem;
+  }
+
+  .admin-shell:not(.admin-shell--sidebar-closed) .admin-sidebar__brand-row {
+    min-height: 42px;
+  }
+
+  .admin-shell:not(.admin-shell--sidebar-closed) .admin-sidebar__identity {
+    margin-block: .65rem .75rem;
+    padding-bottom: .7rem;
+  }
+
+  .admin-shell:not(.admin-shell--sidebar-closed) .admin-sidebar nav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .35rem;
+    overflow: visible;
+    padding: 0;
+  }
+
+  .admin-shell:not(.admin-shell--sidebar-closed) .admin-sidebar nav a {
+    min-width: 0;
+    padding: .6rem .65rem;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .admin-shell:not(.admin-shell--sidebar-closed) .admin-sidebar nav a:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .admin-shell:not(.admin-shell--sidebar-closed) .admin-sidebar__bottom {
+    margin-top: .65rem;
+    padding-top: .65rem;
+  }
+
+  .admin-shell:not(.admin-shell--sidebar-closed) .admin-sidebar__bottom .ui-button {
+    min-height: 40px;
+  }
+
+  .admin-shell:not(.admin-shell--sidebar-closed) .admin-topbar {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    padding-block: .55rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .admin-shell:not(.admin-shell--sidebar-closed) .admin-sidebar nav {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-shell:not(.admin-shell--sidebar-closed) .admin-sidebar nav a:last-child {
+    grid-column: auto;
+  }
+
+  .admin-shell:not(.admin-shell--sidebar-closed) .admin-topbar__profile {
+    max-width: 100%;
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 640px) {
+  .site-footer__grid {
+    grid-template-columns: minmax(0, 1fr);
+    padding-block: var(--space-8);
+  }
+
+  .site-footer__grid > div,
+  .site-footer__grid > nav {
+    min-width: 0;
+  }
+
+  .site-footer__bar .page-shell {
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (max-width: 480px) {
+  .discovery-editorial .event-search,
+  .discovery-search-header__form .event-search {
+    width: 100%;
+    max-width: 100%;
+    grid-template-columns: minmax(0, 1fr);
+    gap: .6rem;
+  }
+
+  .discovery-editorial .event-search > .ui-button,
+  .discovery-search-header__form .event-search > .ui-button {
+    width: 100%;
+    min-width: 0;
+    justify-self: stretch;
+  }
+}
+
+/* Keep the admin navigation stationary while the workspace content scrolls. */
+@media (min-width: 761px) {
+  .admin-shell {
+    height: 100svh;
+    min-height: 0;
+    align-items: stretch;
+    overflow: visible;
+    padding-block: 1rem;
+  }
+
+  .admin-sidebar {
+    position: fixed;
+    z-index: 20;
+    top: 1rem;
+    left: max(var(--page-gutter), calc((100vw - var(--content-width)) / 2));
+    grid-column: 1;
+    width: 240px;
+    height: calc(100svh - 2rem);
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+  }
+
+  .admin-sidebar::-webkit-scrollbar { display: none; }
+
+  .admin-main {
+    grid-column: 2;
+    height: calc(100svh - 2rem);
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    padding-bottom: 1.5rem;
+  }
+
+  .admin-shell--sidebar-closed { grid-template-columns: 68px minmax(0, 1fr); }
+  .admin-shell--sidebar-closed .admin-sidebar { width: 68px; }
+}
+
+@media (max-width: 760px) {
+  .admin-shell,
+  .admin-shell--sidebar-closed {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .admin-main {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+    padding-bottom: 0;
+  }
+}
+
+/* Account workspace: keep the sidebar viewport-sized while the detail pane scrolls. */
+@media (min-width: 641px) {
+  .dashboard {
+    height: 100svh;
+    min-height: 0;
+    align-items: stretch;
+    overflow: hidden;
+    padding-block: 1rem;
+  }
+
+  .dashboard__sidebar {
+    position: fixed;
+    z-index: 10;
+    grid-column: 1;
+    top: 1rem;
+    left: max(var(--page-gutter), calc((100vw - var(--content-width)) / 2));
+    width: 248px;
+    height: calc(100svh - 2rem);
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+  }
+
+  .dashboard__sidebar::-webkit-scrollbar { display: none; }
+
+  .dashboard__main {
+    grid-column: 2;
+    height: calc(100svh - 2rem);
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    padding-bottom: 1.5rem;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 900px) {
+  .dashboard__sidebar { width: 205px; }
+}
+
+@media (max-width: 640px) {
+  .dashboard {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .dashboard__sidebar {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+  }
+
+  .dashboard__main {
+    grid-column: auto;
+    height: auto;
+    overflow: visible;
+    padding-bottom: 0;
+  }
+}
+
+/* Preserve independent scrolling without showing a scrollbar gutter. */
+.admin-main,
+.dashboard__main {
+  scrollbar-width: none;
+}
+
+.admin-main::-webkit-scrollbar,
+.dashboard__main::-webkit-scrollbar {
+  display: none;
+}
+
+/* Event filters stay aligned on wide screens and stack cleanly on phones. */
+.event-filter-panel {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-large);
+  background: var(--surface);
+}
+
+.event-filter-panel .event-filters {
+  display: grid;
+  grid-template-columns: minmax(210px, 1.5fr) repeat(3, minmax(130px, 1fr));
+  align-items: end;
+  gap: .8rem;
+  padding: .9rem;
+}
+
+.event-filter__city,
+.event-filter__control {
+  min-width: 0;
+}
+
+.event-filter__city > div {
+  min-width: 0;
+}
+
+.event-filter__city input,
+.event-filter__control input,
+.event-filter__control select {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-medium);
+  background-color: var(--surface);
+  color: var(--foreground);
+}
+
+.event-filter__control input[type="date"] {
+  display: block;
+  max-width: 100%;
+  color-scheme: light;
+  accent-color: var(--primary);
+  padding-inline: .6rem;
+}
+
+.event-filter__control input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: .7;
+}
+
+.event-filter__control input[type="date"]:hover::-webkit-calendar-picker-indicator {
+  opacity: 1;
+}
+
+.event-filter__control select,
+.admin-filters select {
+  max-width: 100%;
+  padding-right: 2.3rem;
+}
+
+@media (max-width: 900px) {
+  .event-filter-panel .event-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .event-filter__city {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 560px) {
+  .event-filter-panel .event-filters {
+    grid-template-columns: minmax(0, 1fr);
+    padding: .75rem;
+  }
+
+  .event-filter__city {
+    grid-column: auto;
+  }
+
+  .event-filter__city > div {
+    align-items: stretch;
+  }
+
+  .event-filter__city .ui-button {
+    flex: 0 0 auto;
+  }
 }

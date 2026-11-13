@@ -31,7 +31,6 @@ export function DashboardShell({ children }: { children: ReactNode }) {
               return <Link key={link.href} href={link.href} aria-current={active ? "page" : undefined} className={active ? "is-active" : ""}>{link.label}</Link>;
             })}
             {user?.role === "USER" ? <Link href="/become-organizer" aria-current={pathname === "/become-organizer" ? "page" : undefined} className={pathname === "/become-organizer" ? "is-active" : ""}>Become an Organizer</Link> : null}
-            {user?.role === "USER" ? <Link href="/become-organizer" aria-current={pathname === "/become-organizer" ? "page" : undefined} className={pathname === "/become-organizer" ? "is-active" : ""}>Become an Organizer</Link> : null}
           </nav>
           <div className="dashboard__sidebar-bottom"><Link href="/events">Browse events</Link><SignOutButton size="small" /></div>
         </aside>
