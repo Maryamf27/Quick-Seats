@@ -319,12 +319,22 @@ export async function deleteEvent(
       if (hasBookings) {
         throw new AppError("Event cannot be deleted while it has bookings", 409);
       }
-      const hasSeats = await SeatModel.exists({ eventId: event._id })
+      // Seats that nobody holds or has bought are generated inventory and can go with the
+      // event. Active holds and booked seats block deletion.
+      const now = new Date();
+      const activeSeat = await SeatModel.exists({
+        eventId: event._id,
+        $or: [
+          { status: "BOOKED" },
+          { status: "HELD", lockedUntil: { $gt: now } },
+        ],
+      })
         .session(session)
         .exec();
-      if (hasSeats) {
-        throw new AppError("Event cannot be deleted while it has generated seats", 409);
+      if (activeSeat) {
+        throw new AppError("Event cannot be deleted while it has held or booked seats", 409);
       }
+      await SeatModel.deleteMany({ eventId: event._id }).session(session).exec();
 
       const deletion = await EventModel.deleteOne({ _id: event._id })
         .session(session)

@@ -25,3 +25,20 @@ export const loginUserSchema = z
     password: z.string().trim().min(1, "Password is required"),
   })
   .strict();
+
+export const updateProfileSchema = z
+  .object({
+    fullName: z.string().trim().min(2).max(120),
+  })
+  .strict();
+
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, "Current password is required").max(128),
+    newPassword: passwordSchema,
+  })
+  .strict()
+  .refine((payload) => payload.currentPassword !== payload.newPassword, {
+    message: "New password must be different from the current password",
+    path: ["newPassword"],
+  });

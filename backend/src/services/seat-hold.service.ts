@@ -42,7 +42,11 @@ export async function holdSeats(
 
   try {
     await session.withTransaction(async () => {
-      const event = await EventModel.findById(eventId).session(session).lean().exec();
+      const event = await EventModel.findById(eventId)
+        .session(session)
+        .select("status")
+        .lean()
+        .exec();
 
       if (!event) {
         throw new AppError("Event not found", 404);
@@ -52,58 +56,39 @@ export async function holdSeats(
         throw new AppError("Event is not published", 409);
       }
 
-      const seats = await SeatModel.find({
-        _id: { $in: seatObjectIds },
-        eventId,
-      })
-        .session(session)
-        .select("_id status lockedUntil")
-        .lean()
-        .exec();
-
-      if (seats.length !== seatObjectIds.length) {
-        throw new AppError("One or more seats do not belong to this event", 404);
-      }
-
-      const seatMap = new Map(seats.map((seat) => [seat._id.toString(), seat]));
-
-      for (const seatId of payload.seatIds) {
-        const seat = seatMap.get(seatId);
-        if (!seat) {
-          throw new AppError("Seat not found", 404);
-        }
-
-        const isAvailable = seat.status === "AVAILABLE";
-        const isExpired = seat.status === "HELD" && seat.lockedUntil && seat.lockedUntil <= now;
-
-        if (!isAvailable && !isExpired) {
-          throw new AppError("Seat is unavailable for holding", 409);
-        }
-
-        const updatedSeat = await SeatModel.findOneAndUpdate(
-          {
-            _id: seatId,
-            eventId,
-            $or: [{ status: "AVAILABLE" }, { status: "HELD", lockedUntil: { $lte: now } }],
+      // One conditional write claims every requested seat. A seat is claimable only if it
+      // is AVAILABLE or its previous hold has expired, so two concurrent requests can never
+      // both win the same seat. If any seat is not claimed the transaction aborts and no
+      // seat is left partially held.
+      const claim = await SeatModel.updateMany(
+        {
+          _id: { $in: seatObjectIds },
+          eventId,
+          $or: [{ status: "AVAILABLE" }, { status: "HELD", lockedUntil: { $lte: now } }],
+        },
+        {
+          $set: {
+            status: "HELD",
+            lockedBy: userId,
+            lockedUntil: expiresAt,
+            holdId,
           },
-          {
-            $set: {
-              status: "HELD",
-              lockedBy: userId,
-              lockedUntil: expiresAt,
-              holdId,
-            },
-          },
-          {
-            new: true,
-            runValidators: true,
-            session,
-          },
-        ).exec();
+        },
+        { session },
+      ).exec();
 
-        if (!updatedSeat) {
-          throw new AppError("Seat is unavailable for holding", 409);
+      if (claim.modifiedCount !== seatObjectIds.length) {
+        const belonging = await SeatModel.countDocuments({
+          _id: { $in: seatObjectIds },
+          eventId,
+        })
+          .session(session)
+          .exec();
+
+        if (belonging !== seatObjectIds.length) {
+          throw new AppError("One or more seats do not belong to this event", 404);
         }
+        throw new AppError("Seat is unavailable for holding", 409);
       }
     });
 

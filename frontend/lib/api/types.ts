@@ -294,3 +294,61 @@ export interface OrganizerEventListResult {
   events: EventRecord[];
   pagination: Pagination;
 }
+
+export interface AdminUser extends SafeUser {
+  isSuspended?: boolean;
+}
+
+export interface AdminOrganizer extends AdminUser {
+  businessName: string | null;
+  eventCount: number;
+  publishedEventCount: number;
+}
+
+export interface AdminOverviewResult {
+  users: number;
+  organizers: number;
+  suspendedUsers: number;
+  pendingApplications: number;
+  events: number;
+  publishedEvents: number;
+  bookings: number;
+  confirmedBookings: number;
+  ticketsSold: number;
+  revenueByCurrency: Record<string, number>;
+}
+
+export interface AdminEventRow {
+  _id: string;
+  title: string;
+  category: string;
+  status: EventStatus;
+  startDate: string;
+  organizerId: { _id: string; fullName: string; email: string } | string;
+  venueId: { _id: string; name: string; address?: { city?: string } } | string;
+}
+
+export interface AdminBookingRow {
+  id: string;
+  user: { _id: string; fullName: string; email: string } | string | null;
+  event: { _id: string; title: string; startDate: string } | string | null;
+  ticketCount: number;
+  totalAmount: number;
+  currency: string | null;
+  status: BookingStatus;
+  paymentStatus: PaymentStatus;
+  paidAt: string | null;
+  requiresRefund: boolean;
+  refundStatus: RefundStatus;
+  createdAt: string;
+}
+
+export interface AdminAnalyticsResult {
+  from: string;
+  to: string;
+  dailySales: { day: string; currency: string | null; bookings: number; tickets: number; revenue: number }[];
+  bookingsByStatus: Record<string, number>;
+  topEvents: { eventId: string; title: string; category: string | null; bookings: number; tickets: number; revenue: number; currency: string | null }[];
+  categories: { category: string; events: number }[];
+  userGrowth: { day: string; users: number }[];
+}

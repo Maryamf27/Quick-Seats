@@ -36,6 +36,10 @@ export const authenticate: RequestHandler = async (request, _response, next) => 
       throw new AppError("User not found", 401);
     }
 
+    if (user.isSuspended) {
+      throw new AppError("This account has been suspended", 403);
+    }
+
     request.user = {
       id: user._id.toString(),
       email: user.email,

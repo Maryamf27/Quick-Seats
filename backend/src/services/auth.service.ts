@@ -5,7 +5,12 @@ import type { SafeUser } from "../types/auth.types.js";
 import { AppError } from "../utils/app-error.js";
 import { hashPassword, comparePassword } from "../utils/password.js";
 import { isDuplicateKeyError, parseInput } from "../utils/validation.js";
-import { loginUserSchema, registerUserSchema } from "../validators/auth.validator.js";
+import {
+  changePasswordSchema,
+  loginUserSchema,
+  registerUserSchema,
+  updateProfileSchema,
+} from "../validators/auth.validator.js";
 import type { UserRole } from "../types/domain.js";
 
 export function assertPublicRegistrationRole(role?: UserRole): void {
@@ -65,6 +70,10 @@ export async function loginUser(input: unknown) {
     throw new AppError("Invalid email or password", 401);
   }
 
+  if (user.isSuspended) {
+    throw new AppError("This account has been suspended", 403);
+  }
+
   const token = jwt.sign(
     {
       sub: user._id.toString(),
@@ -90,4 +99,36 @@ export async function getCurrentUser(userId: string) {
   }
 
   return sanitizeUser(user.toObject());
+}
+
+export async function updateProfile(userId: string, input: unknown) {
+  const data = parseInput(updateProfileSchema, input);
+  const user = await UserModel.findByIdAndUpdate(
+    userId,
+    { $set: { fullName: data.fullName } },
+    { new: true, runValidators: true },
+  ).exec();
+
+  if (!user) {
+    throw new AppError("User not found", 404);
+  }
+
+  return sanitizeUser(user.toObject());
+}
+
+export async function changePassword(userId: string, input: unknown): Promise<void> {
+  const data = parseInput(changePasswordSchema, input);
+  const user = await UserModel.findById(userId).select("+passwordHash").exec();
+
+  if (!user || !user.passwordHash) {
+    throw new AppError("User not found", 404);
+  }
+
+  const matches = await comparePassword(data.currentPassword, user.passwordHash);
+  if (!matches) {
+    throw new AppError("Current password is incorrect", 400);
+  }
+
+  user.passwordHash = await hashPassword(data.newPassword);
+  await user.save();
 }

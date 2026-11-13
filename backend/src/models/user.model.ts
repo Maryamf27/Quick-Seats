@@ -8,6 +8,7 @@ export interface User {
   passwordHash: string;
   password?: string;
   role: UserRole;
+  isSuspended?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -25,10 +26,12 @@ const userSchema = new Schema<User>(
     passwordHash: { type: String, required: true, select: false },
     password: { type: String, required: false, select: false },
     role: { type: String, enum: USER_ROLES, default: "USER", required: true },
+    isSuspended: { type: Boolean, default: false },
   },
   { timestamps: true, versionKey: false },
 );
 
 userSchema.index({ email: 1 }, { unique: true });
+userSchema.index({ role: 1, createdAt: -1 });
 
 export const UserModel: Model<User> = model<User>("User", userSchema);

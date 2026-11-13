@@ -13,6 +13,8 @@ import type {
   OrganizerEventListResult,
   OrganizerSalesSummary,
 } from "@/lib/api/types";
+import { useToast } from "@/components/ui/toast";
+import { ApiError } from "@/lib/api/errors";
 import { useAuth } from "@/lib/auth/auth-context";
 import { safeImageUrl } from "@/lib/events/poster";
 
@@ -35,6 +37,8 @@ function venueName(event: EventRecord): string {
 
 export function OrganizerEvents({ compact = false }: { compact?: boolean }) {
   const { accessToken } = useAuth();
+  const { notify } = useToast();
+  const [deletingId, setDeletingId] = useState("");
   const [eventState, setEventState] = useState<{
     key: string;
     result: OrganizerEventListResult;
@@ -84,6 +88,26 @@ export function OrganizerEvents({ compact = false }: { compact?: boolean }) {
 
     return () => controller.abort();
   }, [accessToken, compact, page, requestKey]);
+
+  async function deleteEvent(event: EventRecord) {
+    if (!accessToken || deletingId) return;
+    if (!window.confirm(`Delete "${event.title}"? This permanently removes the event and its unsold seats.`)) return;
+    setDeletingId(event._id);
+    try {
+      await eventsApi.delete(event._id, accessToken);
+      notify("Event deleted.", "success");
+      setRetry((current) => current + 1);
+    } catch (error: unknown) {
+      notify(
+        error instanceof ApiError && error.backendMessage
+          ? error.backendMessage
+          : "The event could not be deleted.",
+        "error",
+      );
+    } finally {
+      setDeletingId("");
+    }
+  }
 
   if (eventError) {
     return (
@@ -188,6 +212,17 @@ export function OrganizerEvents({ compact = false }: { compact?: boolean }) {
                       <Link href={`/events/${event._id}`}>View public event</Link>
                     ) : null}
                     <Link href={`/organizer/events/${event._id}/edit`}>Edit event</Link>
+                    {!compact ? (
+                      <Button
+                        variant="destructive"
+                        size="small"
+                        loading={deletingId === event._id}
+                        disabled={Boolean(deletingId)}
+                        onClick={() => void deleteEvent(event)}
+                      >
+                        Delete
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
               </article>

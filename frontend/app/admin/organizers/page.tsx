@@ -1,4 +1,4 @@
 import { AdminShell } from "@/components/organizer/admin-shell";
-import { AdminUnavailable } from "@/components/organizer/admin-unavailable";
+import { AdminOrganizers } from "@/components/organizer/admin-management";
 
-export default function AdminOrganizersPage() { return <AdminShell><AdminUnavailable section="organizers" /></AdminShell>; }
+export default function AdminOrganizersPage() { return <AdminShell><AdminOrganizers /></AdminShell>; }

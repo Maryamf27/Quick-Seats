@@ -13,7 +13,18 @@ export interface LoginInput {
   password: string;
 }
 
+export interface ChangePasswordInput {
+  currentPassword: string;
+  newPassword: string;
+}
+
 export const authApi = {
+  updateProfile(input: { fullName: string }, accessToken: string, options?: ApiRequestOptions): Promise<SafeUser> {
+    return api.patch("/auth/me", input, { ...options, accessToken });
+  },
+  changePassword(input: ChangePasswordInput, accessToken: string, options?: ApiRequestOptions): Promise<null> {
+    return api.post("/auth/change-password", input, { ...options, accessToken });
+  },
   register(input: RegisterInput, options?: ApiRequestOptions): Promise<SafeUser> {
     return api.post("/auth/register", input, options);
   },
