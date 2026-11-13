@@ -29,7 +29,7 @@ export function AuthHeader() {
             {status === "authenticated" && user ? (
               <>
                 {user.role !== "ORGANIZER" ? <Link className="topbar__link" href="/bookings">My bookings</Link> : null}
-                <Link className="topbar__link" href="/account">Hi, {user.fullName.split(" ")[0]}</Link>
+                <Link className="topbar__link" href={user.role === "ORGANIZER" ? "/organizer/dashboard" : "/account"}>Hi, {user.fullName.split(" ")[0]}</Link>
                 <SignOutButton size="small" variant="secondary" />
               </>
             ) : status === "unauthenticated" ? (
