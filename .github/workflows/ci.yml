@@ -10,17 +10,6 @@ jobs:
   backend:
     runs-on: ubuntu-latest
     services:
-      mongodb:
-        image: mongo:7
-        ports:
-          - 27017:27017
-        options: >-
-          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ ping: 1 }).ok'"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
-          --replSet rs0
-          --bind_ip_all
       redis:
         image: redis:7-alpine
         ports:
@@ -66,12 +55,27 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: backend/package-lock.json
-      - name: Initialize isolated MongoDB replica set
+      # mongod flags (--replSet, --bind_ip_all) cannot be passed through a
+      # `services:` block, so start MongoDB manually with `docker run`.
+      - name: Start MongoDB replica set
         working-directory: .
         run: |
-          docker exec "${{ job.services.mongodb.id }}" mongosh --quiet --eval "try { rs.status() } catch (error) { rs.initiate({_id: 'rs0', members: [{_id: 0, host: '127.0.0.1:27017'}]}) }"
+          docker run -d --name mongodb -p 27017:27017 mongo:7 --replSet rs0 --bind_ip_all
+
+          # Wait for mongod to accept connections
           for attempt in {1..30}; do
-            if docker exec "${{ job.services.mongodb.id }}" mongosh --quiet --eval "db.hello().isWritablePrimary" | grep -q true; then
+            if docker exec mongodb mongosh --quiet --eval "db.adminCommand({ ping: 1 }).ok" | grep -q 1; then
+              break
+            fi
+            sleep 2
+          done
+
+          # Initiate the replica set
+          docker exec mongodb mongosh --quiet --eval "try { rs.status() } catch (error) { rs.initiate({_id: 'rs0', members: [{_id: 0, host: '127.0.0.1:27017'}]}) }"
+
+          # Wait for a writable primary
+          for attempt in {1..30}; do
+            if docker exec mongodb mongosh --quiet --eval "db.hello().isWritablePrimary" | grep -q true; then
               exit 0
             fi
             sleep 2
