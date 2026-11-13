@@ -1,6 +1,9 @@
 import { api } from "../client";
 import type { ApiRequestOptions, QueryValue } from "../client";
 import type {
+  BookingStatus,
+  OrganizerBookingRow,
+  Pagination,
   OrganizerReport,
   OrganizerReportQueued,
   OrganizerSalesSummary,
@@ -11,7 +14,21 @@ export interface ReportRange extends Record<string, QueryValue> {
   to?: string;
 }
 
+export interface OrganizerBookingsQuery extends Record<string, QueryValue> {
+  page?: number;
+  limit?: number;
+  eventId?: string;
+  status?: BookingStatus;
+}
+
 export const organizerApi = {
+  bookings(
+    query: OrganizerBookingsQuery,
+    accessToken: string,
+    options?: ApiRequestOptions,
+  ): Promise<{ bookings: OrganizerBookingRow[]; pagination: Pagination }> {
+    return api.get("/organizer/bookings", { ...options, accessToken, query });
+  },
   salesSummary(
     range: ReportRange,
     accessToken: string,

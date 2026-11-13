@@ -352,3 +352,19 @@ export interface AdminAnalyticsResult {
   categories: { category: string; events: number }[];
   userGrowth: { day: string; users: number }[];
 }
+
+export interface OrganizerBookingRow {
+  id: string;
+  eventId: string;
+  eventTitle: string;
+  eventStartDate: string | null;
+  customerName: string;
+  ticketCount: number;
+  seats: { section: string; row: string; seatNumber: number; category: SeatCategory }[];
+  totalAmount: number;
+  currency: string | null;
+  status: BookingStatus;
+  paymentStatus: PaymentStatus;
+  paidAt: string | null;
+  createdAt: string;
+}

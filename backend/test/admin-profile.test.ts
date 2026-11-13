@@ -41,3 +41,14 @@ test("password change enforces strength and a different new password", () => {
     false,
   );
 });
+
+import { organizerBookingsQuerySchema } from "../src/validators/organizer-booking.validator.js";
+
+test("organizer booking query validates filters and rejects unknown keys", () => {
+  const parsed = organizerBookingsQuerySchema.parse({ page: "3", status: "CONFIRMED" });
+  assert.equal(parsed.page, 3);
+  assert.equal(parsed.limit, 20);
+  assert.equal(organizerBookingsQuerySchema.safeParse({ status: "PAID" }).success, false);
+  assert.equal(organizerBookingsQuerySchema.safeParse({ eventId: "nope" }).success, false);
+  assert.equal(organizerBookingsQuerySchema.safeParse({ userId: "x" }).success, false);
+});
