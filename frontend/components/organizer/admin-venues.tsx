@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ErrorState } from "@/components/ui/error-state";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { EmptyState, LoadingState } from "@/components/ui/states";
 import { useToast } from "@/components/ui/toast";
 import { venuesApi } from "@/lib/api/endpoints/venues";
@@ -236,9 +237,7 @@ export function VenueForm({ editing = false }: { editing?: boolean }) {
             <div className="organizer-form__grid">
               <Input label="Name" value={section.name} onChange={(event) => setSection(index, { name: event.target.value })} required maxLength={50} />
               <label className="organizer-form__field">Category
-                <select value={section.seatCategory} onChange={(event) => setSection(index, { seatCategory: event.target.value as SeatCategory })}>
-                  <option value="STANDARD">Standard</option><option value="PREMIUM">Premium</option><option value="VIP">VIP</option>
-                </select>
+                <Select aria-label="Seat category" value={section.seatCategory} options={[{ value: "STANDARD", label: "Standard" }, { value: "PREMIUM", label: "Premium" }, { value: "VIP", label: "VIP" }]} onChange={(next) => setSection(index, { seatCategory: next as SeatCategory })} />
               </label>
               <Input label="Rows" type="number" min={1} step={1} value={section.rows} onChange={(event) => setSection(index, { rows: event.target.value })} required />
               <Input label="Seats per row" type="number" min={1} step={1} value={section.seatsPerRow} onChange={(event) => setSection(index, { seatsPerRow: event.target.value })} required />

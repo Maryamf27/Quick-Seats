@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/error-state";
+import { Select } from "@/components/ui/select";
 import { EmptyState, LoadingState } from "@/components/ui/states";
 import { eventsApi } from "@/lib/api/endpoints/events";
 import { organizerApi } from "@/lib/api/endpoints/organizer";
@@ -71,14 +72,8 @@ export function OrganizerBookings() {
     <section className="organizer-section">
       {heading}
       <div className="admin-filters">
-        <select aria-label="Filter by event" value={eventId} onChange={(event) => { setData(null); setEventId(event.target.value); setPage(1); }}>
-          <option value="">All events</option>
-          {events.map((event) => <option key={event._id} value={event._id}>{event.title}</option>)}
-        </select>
-        <select aria-label="Filter by status" value={status} onChange={(event) => { setData(null); setStatus(event.target.value as BookingStatus | ""); setPage(1); }}>
-          <option value="">All statuses</option>
-          {STATUSES.map((value) => <option key={value} value={value}>{value}</option>)}
-        </select>
+        <Select aria-label="Filter by event" value={eventId} options={[{ value: "", label: "All events" }, ...events.map((event) => ({ value: event._id, label: event.title }))]} onChange={(next) => { setData(null); setEventId(next); setPage(1); }} />
+        <Select aria-label="Filter by status" value={status} options={[{ value: "", label: "All statuses" }, ...STATUSES.map((value) => ({ value, label: value }))]} onChange={(next) => { setData(null); setStatus(next as BookingStatus | ""); setPage(1); }} />
       </div>
 
       {error ? (

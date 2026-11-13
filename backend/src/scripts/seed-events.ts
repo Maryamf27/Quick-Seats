@@ -56,7 +56,7 @@ const events = [
   { slug: "demo-coastal-summer-festival", title: "Coastal Summer Festival", category: "festival", venue: "karachi-bayview", days: 49, hour: 16, photo: "photo-1492684223066-81342ee5ff30", description: "A day-long gathering with live performances, local makers, food stalls, and family activities." },
   { slug: "demo-city-football-final", title: "City Football Championship Final", category: "sports", venue: "lahore-liberty", days: 28, hour: 18, photo: "photo-1522778119026-d647f0596c20", description: "A competitive city final with pre-match commentary and supporters’ activities." },
   { slug: "demo-basketball-night", title: "Basketball Under the Lights", category: "sports", venue: "lahore-liberty", days: 56, hour: 19, photo: "photo-1546519638-68e109498ffc", description: "An evening tournament showcasing regional basketball clubs and emerging players." },
-  { slug: "demo-cricket-t20", title: "Cricket Legends T20", category: "sports", venue: "lahore-liberty", days: 77, hour: 18, photo: "photo-1522778119026-d647f0596c20", description: "A fast-paced exhibition match with local teams, family seating, and an evening presentation." },
+  { slug: "demo-cricket-t20", title: "Cricket Legends T20", category: "sports", venue: "lahore-liberty", days: 77, hour: 18, photo: "photo-1531415074968-036ba1b575da", description: "A fast-paced exhibition match with local teams, family seating, and an evening presentation." },
   { slug: "demo-pakistan-developer-summit", title: "Pakistan Developer Summit", category: "technology", venue: "karachi-creek", days: 42, hour: 9, photo: "photo-1540575467063-178a50c2df87", description: "A one-day programme of software engineering talks, practical sessions, and community discussion." },
   { slug: "demo-applied-ai-forum", title: "Applied AI Forum", category: "technology", venue: "islamabad-margalla", days: 63, hour: 10, photo: "photo-1504384308090-c894fdcc538d", description: "Researchers and practitioners share applied machine learning case studies and responsible deployment lessons." },
   { slug: "demo-startup-founders-meetup", title: "Startup Founders Meetup", category: "networking", venue: "karachi-creek", days: 30, hour: 17, photo: "photo-1517245386807-bb43f82c33c4", description: "A facilitated evening for early-stage founders to meet peers, compare notes, and share practical lessons." },
@@ -66,12 +66,17 @@ const events = [
   { slug: "demo-contemporary-art-weekend", title: "Contemporary Art Weekend", category: "arts", venue: "lahore-garden", days: 84, hour: 11, photo: "photo-1524014482380-0988169f598d", description: "A weekend exhibition of contemporary work, artist conversations, and guided gallery visits." },
   { slug: "demo-old-city-photowalk", title: "Old City Photowalk", category: "photography", venue: "lahore-garden", days: 38, hour: 8, photo: "photo-1576530835964-0eb6fd964528", description: "A small-group street photography walk focused on composition, light, and respectful documentary practice." },
   { slug: "demo-portrait-photography-lab", title: "Portrait Photography Lab", category: "workshop", venue: "karachi-creek", days: 91, hour: 10, photo: "photo-1516321318423-f06f85e504b3", description: "A hands-on portrait session covering natural light, simple setups, and giving clear direction to subjects." },
-  { slug: "demo-creative-coding-workshop", title: "Creative Coding Workshop", category: "workshop", venue: "islamabad-margalla", days: 105, hour: 10, photo: "photo-1504384308090-c894fdcc538d", description: "A practical introduction to generative visuals and interactive sketches for curious beginners." },
+  { slug: "demo-creative-coding-workshop", title: "Creative Coding Workshop", category: "workshop", venue: "islamabad-margalla", days: 105, hour: 10, photo: "photo-1555066931-4365d14bab8c", description: "A practical introduction to generative visuals and interactive sketches for curious beginners." },
   { slug: "demo-theatre-last-monsoon", title: "The Last Monsoon", category: "theatre", venue: "lahore-garden", days: 45, hour: 19, photo: "photo-1747155827987-5e78499b3830", description: "An original theatre production about family, memory, and the changing seasons of city life." },
-  { slug: "demo-urdu-theatre-revival", title: "Urdu Theatre Revival", category: "theatre", venue: "karachi-bayview", days: 112, hour: 19, photo: "photo-1747155827987-5e78499b3830", description: "A staged reading and performance programme celebrating contemporary Urdu drama and new writing." },
-  { slug: "demo-makers-weekend", title: "Makers and Makerspaces Weekend", category: "festival", venue: "islamabad-margalla", days: 126, hour: 11, photo: "photo-1517245386807-bb43f82c33c4", description: "Local makers demonstrate craft, design, and small-scale fabrication through talks and hands-on exhibits." },
-  { slug: "demo-food-and-culture-fair", title: "Food and Culture Fair", category: "festival", venue: "lahore-garden", days: 140, hour: 12, photo: "photo-1576124568433-c2bdf03c6bbc", description: "A community fair bringing together regional food, music, crafts, and cultural demonstrations." },
+  { slug: "demo-urdu-theatre-revival", title: "Urdu Theatre Revival", category: "theatre", venue: "karachi-bayview", days: 112, hour: 19, photo: "photo-1503095396549-807759245b35", description: "A staged reading and performance programme celebrating contemporary Urdu drama and new writing." },
+  { slug: "demo-makers-weekend", title: "Makers and Makerspaces Weekend", category: "festival", venue: "islamabad-margalla", days: 126, hour: 11, photo: "photo-1504148455328-c376907d081c", description: "Local makers demonstrate craft, design, and small-scale fabrication through talks and hands-on exhibits." },
+  { slug: "demo-food-and-culture-fair", title: "Food and Culture Fair", category: "festival", venue: "lahore-garden", days: 140, hour: 12, photo: "photo-1504674900247-0877df9cc836", description: "A community fair bringing together regional food, music, crafts, and cultural demonstrations." },
 ] as const;
+
+const duplicatePhotos = events.map((seed) => seed.photo).filter((photo, index, all) => all.indexOf(photo) !== index);
+if (duplicatePhotos.length > 0) {
+  throw new Error(`Every seeded event needs a unique poster image. Duplicates: ${[...new Set(duplicatePhotos)].join(", ")}`);
+}
 
 function eventDate(daysFromNow: number, hourUtc: number): Date {
   const date = new Date();
@@ -148,6 +153,10 @@ async function seedEvents(): Promise<void> {
         posterUrl: image(seed.photo),
       });
       if (!existing) created += 1;
+      else if (existing.posterUrl !== image(seed.photo)) {
+        existing.posterUrl = image(seed.photo);
+        await existing.save();
+      }
 
       const seatCount = await SeatModel.countDocuments({ eventId: event._id }).exec();
       const expectedSeatCount = venue.expectedSeatCount;

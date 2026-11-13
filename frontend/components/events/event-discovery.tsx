@@ -10,7 +10,9 @@ import {
 import type { FormEvent } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import { ErrorState } from "@/components/ui/error-state";
+import { Select } from "@/components/ui/select";
 import { EventGridSkeleton, LoadingState } from "@/components/ui/states";
 import { eventsApi } from "@/lib/api/events";
 import { ApiError } from "@/lib/api/errors";
@@ -254,39 +256,43 @@ function DiscoveryContent({
           </form>
           <label className="event-filter__control">
             <span>From</span>
-            <input
-              type="date"
+            <DatePicker
+              aria-label="From date"
+              placeholder="Any date"
               value={filters.from}
               max={filters.to || undefined}
-              onChange={(event) => updateFilters({ from: event.target.value })}
+              onChange={(value) => updateFilters({ from: value })}
             />
           </label>
           <label className="event-filter__control">
             <span>To</span>
-            <input
-              type="date"
+            <DatePicker
+              aria-label="To date"
+              placeholder="Any date"
               value={filters.to}
               min={filters.from || undefined}
-              onChange={(event) => updateFilters({ to: event.target.value })}
+              onChange={(value) => updateFilters({ to: value })}
             />
           </label>
           <label className="event-filter__control">
             <span>Sort by</span>
-            <select
+            <Select
+              aria-label="Sort by"
               value={`${filters.sortBy}:${filters.order}`}
-              onChange={(event) => {
-                const [sortBy, order] = event.target.value.split(":");
+              options={[
+                { value: "startDate:asc", label: "Soonest first" },
+                { value: "startDate:desc", label: "Latest date first" },
+                { value: "createdAt:desc", label: "Recently added" },
+                { value: "createdAt:asc", label: "Oldest added" },
+              ]}
+              onChange={(next) => {
+                const [sortBy, order] = next.split(":");
                 updateFilters({
                   sortBy: sortBy === "createdAt" ? "createdAt" : "startDate",
                   order: order === "desc" ? "desc" : "asc",
                 });
               }}
-            >
-              <option value="startDate:asc">Soonest first</option>
-              <option value="startDate:desc">Latest date first</option>
-              <option value="createdAt:desc">Recently added</option>
-              <option value="createdAt:asc">Oldest added</option>
-            </select>
+            />
           </label>
           {hasActiveFilters ? (
             <Button type="button" size="small" variant="secondary" onClick={clearFilters}>

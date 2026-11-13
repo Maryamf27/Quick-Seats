@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/error-state";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Select } from "@/components/ui/select";
 import { LoadingState } from "@/components/ui/states";
 import { useToast } from "@/components/ui/toast";
 import { adminApi } from "@/lib/api/endpoints/admin";
@@ -139,9 +140,7 @@ export function AdminUsers() {
   return (
     <Section title="Users" description="Search accounts, change organizer access and suspend or restore accounts.">
       <SearchBar value={search} placeholder="Search name or email" onSubmit={(value) => { setSearch(value); setPage(1); }}>
-        <select aria-label="Filter by role" value={role} onChange={(event) => { setRole(event.target.value as typeof role); setPage(1); }}>
-          <option value="">All roles</option><option value="USER">Customers</option><option value="ORGANIZER">Organizers</option><option value="ADMIN">Admins</option>
-        </select>
+        <Select aria-label="Filter by role" value={role} options={[{ value: "", label: "All roles" }, { value: "USER", label: "Customers" }, { value: "ORGANIZER", label: "Organizers" }, { value: "ADMIN", label: "Admins" }]} onChange={(next) => { setRole(next as typeof role); setPage(1); }} />
       </SearchBar>
       {list.error ? <ErrorState title="Couldn’t load users" description="The user directory could not be retrieved." onRetry={list.reload} />
         : !list.state ? <LoadingState label="Loading users…" /> : (
@@ -255,9 +254,7 @@ export function AdminEvents() {
   return (
     <Section title="Events" description="Every event on the platform, whatever its publication status.">
       <SearchBar value={search} placeholder="Search event title" onSubmit={(value) => { setSearch(value); setPage(1); }}>
-        <select aria-label="Filter by status" value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }}>
-          <option value="">All statuses</option>{EVENT_STATUSES.map((value) => <option key={value} value={value}>{value}</option>)}
-        </select>
+        <Select aria-label="Filter by status" value={status} options={[{ value: "", label: "All statuses" }, ...EVENT_STATUSES.map((value) => ({ value, label: value }))]} onChange={(next) => { setStatus(next); setPage(1); }} />
       </SearchBar>
       {list.error ? <ErrorState title="Couldn’t load events" description="The event directory could not be retrieved." onRetry={list.reload} />
         : !list.state ? <LoadingState label="Loading events…" /> : (
@@ -309,9 +306,7 @@ export function AdminBookings() {
   return (
     <Section title="Bookings" description="All customer bookings with payment and refund state.">
       <div className="admin-filters">
-        <select aria-label="Filter by status" value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }}>
-          <option value="">All statuses</option>{BOOKING_STATUSES.map((value) => <option key={value} value={value}>{value}</option>)}
-        </select>
+        <Select aria-label="Filter by status" value={status} options={[{ value: "", label: "All statuses" }, ...BOOKING_STATUSES.map((value) => ({ value, label: value }))]} onChange={(next) => { setStatus(next); setPage(1); }} />
       </div>
       {list.error ? <ErrorState title="Couldn’t load bookings" description="The booking directory could not be retrieved." onRetry={list.reload} />
         : !list.state ? <LoadingState label="Loading bookings…" /> : (
@@ -360,9 +355,7 @@ export function AdminAnalytics() {
 
   const range = (
     <div className="admin-filters">
-      <select aria-label="Time range" value={days} onChange={(event) => { setData(null); setDays(Number(event.target.value)); }}>
-        <option value={7}>Last 7 days</option><option value={30}>Last 30 days</option><option value={90}>Last 90 days</option><option value={365}>Last 12 months</option>
-      </select>
+      <Select aria-label="Time range" value={String(days)} options={[{ value: "7", label: "Last 7 days" }, { value: "30", label: "Last 30 days" }, { value: "90", label: "Last 90 days" }, { value: "365", label: "Last 12 months" }]} onChange={(next) => { setData(null); setDays(Number(next)); }} />
     </div>
   );
 
