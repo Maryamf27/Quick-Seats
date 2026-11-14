@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { HeaderSearch } from "@/components/layout/header-search";
 import { useAuth } from "@/lib/auth/auth-context";
-import { SignOutButton } from "./sign-out-button";
+import { AccountMenu } from "./account-menu";
+import { SignInLink } from "./sign-in-link";
 
 const CATEGORIES = ["Concert", "Sports", "Comedy", "Theatre", "Festival", "Workshop"];
 
@@ -28,14 +28,13 @@ export function AuthHeader() {
             </button>
             {status === "authenticated" && user ? (
               <>
-                {user.role !== "ORGANIZER" ? <Link className="topbar__link" href="/bookings">My bookings</Link> : null}
-                <Link className="topbar__link" href={user.role === "ORGANIZER" ? "/organizer/dashboard" : "/account"}>Hi, {user.fullName.split(" ")[0]}</Link>
-                <SignOutButton size="small" variant="secondary" />
+                {user.role === "USER" ? <Link className="topbar__link" href="/dashboard/bookings">My bookings</Link> : null}
+                <AccountMenu />
               </>
             ) : status === "unauthenticated" ? (
               <>
                 <Link className="topbar__link" href="/register">Create account</Link>
-                <Button href="/login" size="small">Sign in</Button>
+                <SignInLink asButton size="small" />
               </>
             ) : null}
           </nav>

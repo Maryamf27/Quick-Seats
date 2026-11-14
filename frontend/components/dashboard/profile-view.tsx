@@ -16,7 +16,7 @@ function messageFor(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
 }
 
-export function ProfileForms() {
+export function ProfileForms({ showDetails = true }: { showDetails?: boolean } = {}) {
   const { user, accessToken, updateUser } = useAuth();
   const { notify } = useToast();
   const [fullName, setFullName] = useState(user?.fullName ?? "");
@@ -76,11 +76,11 @@ export function ProfileForms() {
 
   return (
     <>
-      <dl className="profile-details">
+      {showDetails ? <dl className="profile-details">
         <div><dt>Email address</dt><dd>{user.email}</dd></div>
         <div><dt>Account type</dt><dd>{user.role}</dd></div>
         <div><dt>Member since</dt><dd>{new Date(user.createdAt).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })}</dd></div>
-      </dl>
+      </dl> : null}
 
       <form className="profile-form" onSubmit={(event) => void saveName(event)} noValidate>
         <h2>Name</h2>
@@ -109,7 +109,9 @@ export function ProfileView() {
           <p>Manage your QuickSeats account details.</p>
         </div>
       </header>
-      <ProfileForms />
+      <div className="profile-settings">
+        <ProfileForms />
+      </div>
     </section>
   );
 }

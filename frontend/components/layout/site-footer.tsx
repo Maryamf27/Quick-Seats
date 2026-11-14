@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SignInLink } from "@/components/auth/sign-in-link";
 
 export function SiteFooter() {
   return (
@@ -22,7 +23,7 @@ export function SiteFooter() {
           <h2>Your account</h2>
           <Link href="/bookings">My bookings</Link>
           <Link href="/account">Account</Link>
-          <Link href="/login">Sign in</Link>
+          <SignInLink />
         </nav>
         <div>
           <h2>How it works</h2>

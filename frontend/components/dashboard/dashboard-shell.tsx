@@ -98,7 +98,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   const initials = displayName.trim().charAt(0).toUpperCase() || "U";
 
   return (
-    <ProtectedRoute>
+    <ProtectedRoute roles={["USER"]} redirectOtherRoles>
       <div
         className={`dashboard page-shell${collapsed ? " dashboard--sidebar-closed" : ""}${navOpen ? " dashboard--nav-open" : ""}`}
       >

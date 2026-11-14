@@ -4,7 +4,7 @@ import {
   validateLogin,
   validateRegistration,
 } from "../lib/auth/validation";
-import { getSafeReturnPath } from "../lib/auth/navigation";
+import { getLoginHref, getSafeReturnPath } from "../lib/auth/navigation";
 
 test("accepts registration values that meet the backend password rules", () => {
   assert.deepEqual(
@@ -53,10 +53,18 @@ test("preserves only safe same-origin return destinations", () => {
     getSafeReturnPath("/account?tab=profile#details", origin),
     "/account?tab=profile#details",
   );
-  assert.equal(getSafeReturnPath("https://attacker.example", origin), "/dashboard");
-  assert.equal(getSafeReturnPath("//attacker.example/path", origin), "/dashboard");
-  assert.equal(getSafeReturnPath("/login?next=/account", origin), "/dashboard");
-  assert.equal(getSafeReturnPath(null, origin), "/dashboard");
+  assert.equal(getSafeReturnPath("https://attacker.example", origin), "/");
+  assert.equal(getSafeReturnPath("//attacker.example/path", origin), "/");
+  assert.equal(getSafeReturnPath("/login?next=/account", origin), "/");
+  assert.equal(getSafeReturnPath(null, origin), "/");
   assert.equal(getSafeReturnPath(null, origin, "ORGANIZER"), "/organizer/dashboard");
   assert.equal(getSafeReturnPath(null, origin, "ADMIN"), "/admin/dashboard");
+});
+
+test("builds a sign-in link that returns to the current page", () => {
+  assert.equal(getLoginHref("/events/abc?date=today"), "/login?next=%2Fevents%2Fabc%3Fdate%3Dtoday");
+  assert.equal(getLoginHref("/"), "/login");
+  assert.equal(getLoginHref("/login?next=/x"), "/login");
+  assert.equal(getLoginHref("/register"), "/login");
+  assert.equal(getLoginHref("//attacker.example"), "/login");
 });

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { SignInLink } from "@/components/auth/sign-in-link";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/error-state";
 import { LoadingState } from "@/components/ui/states";
@@ -581,7 +582,7 @@ export function SeatMap({
             <strong>{connectionLabel(visibleConnectionStatus)}</strong>
             {connectionMessage ? <small>{connectionMessage}</small> : null}
             {visibleConnectionStatus === "unauthorized" ? (
-              <a href="/login">Sign in</a>
+              <SignInLink />
             ) : null}
           </div>
         </div>

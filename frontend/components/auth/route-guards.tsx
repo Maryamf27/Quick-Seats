@@ -4,7 +4,7 @@ import { useEffect, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth/auth-context";
-import { getSafeReturnPath } from "@/lib/auth/navigation";
+import { getRoleHome, getSafeReturnPath } from "@/lib/auth/navigation";
 import type { UserRole } from "@/lib/api/types";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/error-state";
@@ -13,9 +13,12 @@ import { LoadingState } from "@/components/ui/states";
 export function ProtectedRoute({
   children,
   roles,
+  redirectOtherRoles = false,
 }: {
   children: ReactNode;
   roles?: readonly UserRole[];
+  /** Send signed-in users without a matching role to their own dashboard instead of showing "access denied". */
+  redirectOtherRoles?: boolean;
 }) {
   const { status, user, refreshSession } = useAuth();
   const router = useRouter();
@@ -38,6 +41,13 @@ export function ProtectedRoute({
     }
   }, [pathname, router, status]);
 
+  const wrongRole = Boolean(user && roles && !roles.includes(user.role));
+  useEffect(() => {
+    if (redirectOtherRoles && wrongRole && user) {
+      router.replace(getRoleHome(user.role));
+    }
+  }, [redirectOtherRoles, router, user, wrongRole]);
+
   if (status === "loading") {
     return <LoadingState label="Checking your sign-in…" />;
   }
@@ -53,7 +63,10 @@ export function ProtectedRoute({
   if (status === "unauthenticated" || !user) {
     return <LoadingState label="Taking you to sign in…" />;
   }
-  if (roles && !roles.includes(user.role)) {
+  if (wrongRole && redirectOtherRoles) {
+    return <LoadingState label="Opening your dashboard…" />;
+  }
+  if (wrongRole) {
     return (
       <section className="page-shell auth-access-denied" role="alert">
         <span className="eyebrow">Access restricted</span>
