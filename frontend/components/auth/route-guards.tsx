@@ -23,7 +23,10 @@ export function ProtectedRoute({
 
   useEffect(() => {
     if (status === "unauthenticated") {
-      const next = encodeURIComponent(pathname || "/account");
+      // Keep query params (e.g. Stripe session_id on /booking/success) so the
+      // user can finish payment confirmation after signing back in.
+      const returnPath = `${pathname || "/account"}${window.location.search}`;
+      const next = encodeURIComponent(returnPath);
       let reason = "";
       try {
         if (window.sessionStorage.getItem("quickseats-session-expired") === "1") {

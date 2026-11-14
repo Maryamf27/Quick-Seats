@@ -5,6 +5,8 @@ import {
   getBookingById,
   getBookingStatus,
   getMyBookings,
+  verifyBookingPayment,
+  verifyCheckoutSessionPayment,
 } from "../services/checkout.service.js";
 import { sendSuccess } from "../utils/api-response.js";
 import { parseInput } from "../utils/validation.js";
@@ -12,6 +14,7 @@ import {
   bookingIdParamsSchema,
   createCheckoutSchema,
   myBookingsQuerySchema,
+  verifyCheckoutQuerySchema,
 } from "../validators/booking.validator.js";
 
 export const checkoutController: RequestHandler = async (request, response) => {
@@ -45,6 +48,28 @@ export const getBookingStatusController: RequestHandler = async (request, respon
 
   const status = await getBookingStatus(bookingId, user.id, user.role);
   return sendSuccess(response, status, "Booking status retrieved successfully");
+};
+
+export const verifyBookingPaymentController: RequestHandler = async (request, response) => {
+  const { bookingId } = parseInput(bookingIdParamsSchema, request.params);
+  const user = request.user;
+  if (!user) {
+    return response.status(401).json({ success: false, message: "Authentication required" });
+  }
+
+  const status = await verifyBookingPayment(bookingId, user.id, user.role);
+  return sendSuccess(response, status, "Booking payment verified");
+};
+
+export const verifyCheckoutSessionController: RequestHandler = async (request, response) => {
+  const { session_id: sessionId } = parseInput(verifyCheckoutQuerySchema, request.query);
+  const user = request.user;
+  if (!user) {
+    return response.status(401).json({ success: false, message: "Authentication required" });
+  }
+
+  const status = await verifyCheckoutSessionPayment(sessionId, user.id, user.role);
+  return sendSuccess(response, status, "Booking payment verified");
 };
 
 export const getMyBookingsController: RequestHandler = async (request, response) => {

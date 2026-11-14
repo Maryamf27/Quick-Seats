@@ -25,7 +25,7 @@ interface SeatNotification {
   };
 }
 
-interface WebhookResult {
+export interface WebhookResult {
   notifications: SeatNotification[];
   refundBookingIds: string[];
 }
@@ -140,42 +140,48 @@ async function setEventBooking(
     .exec();
 }
 
-async function handleCheckoutCompleted(
-  eventRecordId: Types.ObjectId,
+interface ConfirmationOutcome {
+  ok: boolean;
+  bookingId?: Types.ObjectId;
+  reason?: string;
+}
+
+/**
+ * Core logic for reconciling a Checkout Session with its booking.
+ * Shared by the Stripe webhook handler and the success-page verification
+ * endpoint so a booking is confirmed even if the webhook is delayed or
+ * never reaches the server (e.g. local development without Stripe CLI).
+ */
+export async function confirmCheckoutSession(
   checkout: Stripe.Checkout.Session,
   session: mongoose.ClientSession,
   result: WebhookResult,
-): Promise<boolean> {
+): Promise<ConfirmationOutcome> {
   const metadata = getMetadata(checkout.metadata);
   if (!validObjectId(metadata.bookingId) || !metadata.holdId || !metadata.eventId) {
-    await markEventFailure(eventRecordId, "Checkout session metadata is incomplete", session);
-    return false;
+    return { ok: false, reason: "Checkout session metadata is incomplete" };
   }
 
   const booking = await BookingModel.findById(metadata.bookingId).session(session).exec();
-  if (booking) {
-    await setEventBooking(eventRecordId, booking._id, session);
-  }
+  const bookingId = booking?._id;
   if (
     !booking ||
     booking.holdId !== metadata.holdId ||
     booking.eventId.toString() !== metadata.eventId ||
     (booking.stripeSessionId && booking.stripeSessionId !== checkout.id)
   ) {
-    await markEventFailure(eventRecordId, "Checkout session does not match its booking", session);
-    return false;
+    return { ok: false, bookingId, reason: "Checkout session does not match its booking" };
   }
 
   if (checkout.payment_status !== "paid") {
     booking.stripeSessionId = checkout.id;
     await booking.save({ session });
-    return true;
+    return { ok: true, bookingId };
   }
 
   const paymentIntentId = getStringId(checkout.payment_intent);
   if (!paymentIntentId) {
-    await markEventFailure(eventRecordId, "Paid Checkout Session has no Payment Intent", session);
-    return false;
+    return { ok: false, bookingId, reason: "Paid Checkout Session has no Payment Intent" };
   }
 
   const currency = booking.currency?.toLowerCase();
@@ -190,12 +196,11 @@ async function handleCheckoutCompleted(
     amountMatches = false;
   }
   if (booking.stripePaymentIntentId && booking.stripePaymentIntentId !== paymentIntentId) {
-    await markEventFailure(eventRecordId, "Payment Intent does not match the booking", session);
-    return false;
+    return { ok: false, bookingId, reason: "Payment Intent does not match the booking" };
   }
 
   if (booking.status === "CONFIRMED" && booking.paymentStatus === "PAID") {
-    return true;
+    return { ok: true, bookingId };
   }
   booking.stripeSessionId = checkout.id;
 
@@ -211,7 +216,7 @@ async function handleCheckoutCompleted(
     }
     await booking.save({ session });
     result.refundBookingIds.push(booking._id.toString());
-    return true;
+    return { ok: true, bookingId };
   }
 
   const expectedSeatIds = booking.seatIds.map((seatId) => seatId.toString()).sort();
@@ -258,7 +263,7 @@ async function handleCheckoutCompleted(
     }
     await booking.save({ session });
     result.refundBookingIds.push(booking._id.toString());
-    return true;
+    return { ok: true, bookingId };
   }
 
   const seatUpdate = await SeatModel.updateMany(
@@ -307,6 +312,23 @@ async function handleCheckoutCompleted(
       occurredAt: new Date().toISOString(),
     },
   });
+  return { ok: true, bookingId };
+}
+
+async function handleCheckoutCompleted(
+  eventRecordId: Types.ObjectId,
+  checkout: Stripe.Checkout.Session,
+  session: mongoose.ClientSession,
+  result: WebhookResult,
+): Promise<boolean> {
+  const outcome = await confirmCheckoutSession(checkout, session, result);
+  if (outcome.bookingId) {
+    await setEventBooking(eventRecordId, outcome.bookingId, session);
+  }
+  if (!outcome.ok) {
+    await markEventFailure(eventRecordId, outcome.reason ?? "Checkout session could not be reconciled", session);
+    return false;
+  }
   return true;
 }
 

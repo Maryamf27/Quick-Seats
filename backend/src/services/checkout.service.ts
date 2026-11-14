@@ -10,6 +10,9 @@ import { AppError } from "../utils/app-error.js";
 import { fromMinorUnits, toMinorUnits } from "../utils/currency.js";
 import { parseInput } from "../utils/validation.js";
 import { bookingIdParamsSchema, createCheckoutSchema, myBookingsQuerySchema } from "../validators/booking.validator.js";
+import { confirmCheckoutSession, type WebhookResult } from "./webhook.service.js";
+import { notifySeatUpdate } from "./seat-notification.service.js";
+import { retryBookingRefund } from "./refund.service.js";
 
 type MyBookingsQuery = ReturnType<typeof myBookingsQuerySchema.parse>;
 
@@ -436,6 +439,99 @@ export async function getBookingStatus(bookingId: string, userId: string, role: 
     refundStatus: booking.refundStatus ?? "NOT_REQUIRED",
     paidAt: booking.paidAt?.toISOString() ?? null,
   };
+}
+
+function bookingStatusPayload(booking: Booking) {
+  return {
+    bookingId: booking._id.toString(),
+    status: booking.status,
+    paymentStatus: booking.paymentStatus,
+    requiresRefund: booking.requiresRefund ?? false,
+    refundStatus: booking.refundStatus ?? "NOT_REQUIRED",
+    paidAt: booking.paidAt?.toISOString() ?? null,
+  };
+}
+
+async function reconcilePaidCheckout(
+  checkout: Stripe.Checkout.Session,
+  booking: Booking,
+) {
+  if (booking.status !== "PENDING" || booking.paymentStatus === "PAID") {
+    return bookingStatusPayload(booking);
+  }
+
+  const session = await mongoose.startSession();
+  const result: WebhookResult = { notifications: [], refundBookingIds: [] };
+  try {
+    await session.withTransaction(async () => {
+      await confirmCheckoutSession(checkout, session, result);
+    });
+  } finally {
+    await session.endSession();
+  }
+
+  for (const notification of result.notifications) {
+    notifySeatUpdate(notification.eventName, notification.payload);
+  }
+  for (const refundBookingId of result.refundBookingIds) {
+    await retryBookingRefund(refundBookingId).catch((error: unknown) => {
+      console.error("Success-page payment refund attempt failed", {
+        bookingId: refundBookingId,
+        errorType: error instanceof Error ? error.name : "UnknownError",
+      });
+    });
+  }
+
+  const refreshed = await BookingModel.findById(booking._id).exec();
+  if (!refreshed) {
+    throw new AppError("Booking not found after payment verification", 404);
+  }
+  return bookingStatusPayload(refreshed);
+}
+
+/**
+ * Fallback payment verification for the success page. Retrieves the Stripe
+ * Checkout Session directly and reconciles it with the booking, so a booking
+ * is confirmed even when the Stripe webhook is delayed or cannot reach the
+ * server (e.g. local development without the Stripe CLI).
+ */
+export async function verifyBookingPayment(bookingIdValue: string, userId: string, role: UserRole) {
+  const booking = await findBookingForViewer(bookingIdValue, userId, role);
+
+  if (booking.status !== "PENDING" || booking.paymentStatus === "PAID") {
+    return bookingStatusPayload(booking);
+  }
+
+  if (!booking.stripeSessionId) {
+    throw new AppError("This booking has no checkout session to verify", 409);
+  }
+
+  const checkout = await stripe.checkout.sessions.retrieve(booking.stripeSessionId);
+  return reconcilePaidCheckout(checkout, booking);
+}
+
+/**
+ * Same reconciliation as verifyBookingPayment, but keyed by the Stripe
+ * Checkout Session id from the success URL. This is the reliable path when
+ * the browser lost the pending booking id during the Stripe redirect.
+ */
+export async function verifyCheckoutSessionPayment(
+  sessionId: string,
+  userId: string,
+  role: UserRole,
+) {
+  const checkout = await stripe.checkout.sessions.retrieve(sessionId);
+  const bookingId = checkout.metadata?.bookingId;
+  if (!bookingId || !Types.ObjectId.isValid(bookingId)) {
+    throw new AppError("Checkout session is not linked to a booking", 404);
+  }
+
+  const booking = await findBookingForViewer(bookingId, userId, role);
+  if (booking.stripeSessionId && booking.stripeSessionId !== checkout.id) {
+    throw new AppError("Checkout session does not match this booking", 409);
+  }
+
+  return reconcilePaidCheckout(checkout, booking);
 }
 
 export async function getMyBookings(userId: string, query: MyBookingsQuery) {

@@ -67,4 +67,25 @@ export const bookingsApi = {
       accessToken,
     });
   },
+  verifyPayment(
+    bookingId: string,
+    accessToken: string,
+    options?: ApiRequestOptions,
+  ): Promise<BookingStatusResult> {
+    return api.get(`/bookings/${encodeURIComponent(bookingId)}/verify-payment`, {
+      ...options,
+      accessToken,
+    });
+  },
+  verifyCheckoutSession(
+    sessionId: string,
+    accessToken: string,
+    options?: ApiRequestOptions,
+  ): Promise<BookingStatusResult> {
+    return api.get("/bookings/verify-checkout", {
+      ...options,
+      accessToken,
+      query: { session_id: sessionId },
+    });
+  },
 };
